@@ -174,7 +174,7 @@ create index on offers (company_id);
 create table interactions (
   id              uuid primary key default gen_random_uuid(),
   company_id      uuid not null references companies on delete cascade,
-  occurred_on     date not null,
+  occurred_on     date,                        -- null when only the thread is known
   channel         text not null check (channel in ('email','meeting','call','event','other')),
   direction       text check (direction in ('inbound','outbound')),
   subject         text,

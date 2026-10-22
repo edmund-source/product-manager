@@ -11,5 +11,21 @@ vendors sell (or pitch) to us, what they carry, at what price, and where.
 
 ## Setup
 
-    cp .env.example .env   # fill in DATABASE_URL
-    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261022000000_vendor_register.sql
+    pnpm install
+    cp .env.example .env              # set DATABASE_URL
+    pnpm db:migrate                   # applies supabase/migrations/*.sql once each
+
+Local Postgres instead of Supabase: create a database, run
+`create extension pgcrypto; create extension citext;` in it as a superuser,
+and point `DATABASE_URL` at it.
+
+## Importing suppliers from Gmail
+
+`data/suppliers_from_gmail.json` holds the vendor list extracted from Edmund's
+mailbox (companies, brands, products and prices quoted, contacts, Gmail thread
+ids). `data/` is git-ignored because it contains contact details.
+
+    pnpm import:gmail data/suppliers_from_gmail.json
+
+Re-running is safe: companies, brands and contacts are upserted, and the
+email-sourced offers, interactions and documents are replaced.

@@ -1,0 +1,12 @@
+{
+  "name": "product-manager",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:migrate": "node scripts/migrate.mjs",
+    "import:gmail": "node scripts/import-gmail-suppliers.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}
