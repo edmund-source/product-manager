@@ -38,7 +38,7 @@
 [hidden] { display: none !important; }
 html, body { background: var(--bg); color: var(--fg); }
 body { font: 14.5px/1.5 var(--body); }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .wrap { max-width: 1240px; margin: 0 auto; }
@@ -50,35 +50,43 @@ h2 { font-size: 19px; }
 .mono { font-family: var(--mono); }
 
 /* header */
-header.top { padding-block: 28px 18px; }
+header.top { padding-block: 16px 10px; }
 header.top .wrap { display: grid; gap: 10px; }
 .stamp { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { font: 500 12px/1 var(--mono); padding: 6px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
 .lede { color: var(--muted); max-width: 72ch; margin: 0; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.marie { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 12px; max-width: 920px; }
-.marie-head { display: flex; gap: 12px; align-items: center; }
-.avatar { flex: none; }
-.marie-intro { display: grid; gap: 2px; font-size: 14px; color: var(--muted); }
-.marie-intro b { font: 600 17px/1.2 var(--display); color: var(--fg); }
-.marie-ask { display: flex; gap: 8px; }
-.marie-ask input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
-.marie-ask button { border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: 10px; padding: 8px 16px; font-weight: 600; cursor: pointer; }
-.marie-ask button#marie-stop { background: transparent; color: var(--fg); border-color: var(--line); }
-.marie-ask button:disabled { opacity: .6; cursor: default; }
-.marie-sugg { display: flex; flex-wrap: wrap; gap: 6px; }
-.marie-sugg button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 5px 11px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
-.marie-sugg button:hover { color: var(--fg); border-color: var(--faint); }
-.marie-log { display: grid; gap: 10px; max-height: 460px; overflow-y: auto; padding-right: 4px; }
-.turn { display: grid; gap: 4px; font-size: 14px; line-height: 1.55; }
-.turn.q { justify-self: end; background: var(--link-soft); border-radius: 12px 12px 2px 12px; padding: 8px 12px; max-width: 85%; }
-.turn.a { background: var(--bg); border: 1px solid var(--line); border-radius: 12px 12px 12px 2px; padding: 10px 12px; }
-.turn.a p { margin: 0 0 6px; max-width: none; }
-.turn.a ul { margin: 0 0 6px; padding-left: 18px; }
-.turn .who { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.layout { display: grid; grid-template-columns: 360px minmax(0, 1fr); align-items: start; }
+.content { min-width: 0; }
+.chat { position: sticky; top: 0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--line);
+  padding-top: max(14px, env(safe-area-inset-top, 0px)); padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: 14px; z-index: 6; }
+.chat-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 12px; }
+.turn { display: flex; gap: 8px; align-items: flex-end; font-size: 14px; line-height: 1.55; }
+.turn.q { justify-content: flex-end; }
+.turn.q .bubble { background: var(--link-soft); border-radius: 14px 14px 4px 14px; max-width: 85%; }
+.turn.a .bubble { background: var(--bg); border: 1px solid var(--line); border-radius: 14px 14px 14px 4px; max-width: calc(100% - 40px); }
+.bubble { padding: 8px 12px; min-width: 0; overflow-wrap: anywhere; }
+.bubble p { margin: 0 0 6px; max-width: none; }
+.bubble p:last-child, .bubble ul:last-child { margin-bottom: 0; }
+.bubble ul { margin: 0 0 6px; padding-left: 18px; }
+.pfp { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex: none; }
 .turn .busy { color: var(--muted); font-style: italic; }
-.marie-note { font-size: 12.5px; color: var(--muted); min-height: 0; }
+.marie-sugg { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 40px; }
+.marie-sugg button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 5px 11px; font-size: 12.5px; color: var(--muted); cursor: pointer; text-align: left; }
+.marie-sugg button:hover { color: var(--fg); border-color: var(--faint); }
+.chat-ask { display: flex; gap: 6px; align-items: flex-end; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); padding: 6px; }
+.chat-ask textarea { flex: 1; min-width: 0; resize: none; border: 0; background: transparent; padding: 6px 6px; max-height: 140px; line-height: 1.45; outline: none; }
+.chat-ask:focus-within { border-color: var(--link); }
+.chat-ask button { border: 0; background: var(--accent); color: var(--surface); border-radius: 10px; padding: 7px 12px; font-weight: 600; cursor: pointer; }
+.chat-ask button#marie-stop { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.chat-ask button:disabled { opacity: .55; cursor: default; }
+.marie-note { font-size: 12.5px; color: var(--muted); padding: 0 2px 8px; }
 .marie-note:empty { display: none; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .chat { position: static; height: auto; max-height: none; border-right: 0; border-bottom: 1px solid var(--line); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
+  .chat-log { max-height: 55vh; }
+}
 .refresh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--muted); }
 .refresh button { border: 1px solid var(--link); background: var(--link-soft); color: var(--fg); border-radius: 8px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
 .refresh button:disabled { opacity: .6; cursor: default; }
@@ -216,31 +224,24 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
 @media (max-width: 640px) { .search { width: 100%; } .fx { width: 100%; } }
 </style>
 
+<div class="layout">
+<aside class="chat" id="marie" aria-label="Chat with Marie">
+  <div class="chat-log" id="marie-log" aria-live="polite">
+    <div class="turn a"><img class="pfp" src="data:image/webp;base64,AVATAR_B64" alt="Marie" width="32" height="32"><div class="bubble"><p>Hi, I'm Marie. Ask me about partners, prices or financing. I look things up in this page's data and tell you what it means.</p></div></div>
+    <div class="marie-sugg" id="marie-sugg"></div>
+  </div>
+  <div class="marie-note" id="marie-note" role="status"></div>
+  <form class="chat-ask" id="marie-form">
+    <label class="sr" for="marie-q">Message Marie</label>
+    <textarea id="marie-q" rows="1" placeholder="Ask Marie…"></textarea>
+    <button type="submit" id="marie-send" aria-label="Send">Send</button>
+    <button type="button" id="marie-stop" hidden>Stop</button>
+  </form>
+</aside>
+<div class="content">
 <header class="top gutter">
   <div class="wrap">
     <h1 class="sr">Helios partner explorer</h1>
-    <section class="marie" id="marie" aria-label="Ask Marie">
-      <div class="marie-head">
-        <svg class="avatar" viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
-          <circle cx="32" cy="32" r="31" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-          <g stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round">
-            <path d="M32 7v6M32 51v6M7 32h6M51 32h6M14.3 14.3l4.2 4.2M45.5 45.5l4.2 4.2M14.3 49.7l4.2-4.2M45.5 18.5l4.2-4.2"/>
-          </g>
-          <circle cx="32" cy="32" r="14" fill="var(--accent)"/>
-          <text x="32" y="38" text-anchor="middle" font-family="Bricolage Grotesque, Segoe UI, sans-serif" font-weight="700" font-size="17" fill="var(--surface)">M</text>
-        </svg>
-        <div class="marie-intro"><b>Marie</b><span id="marie-sub">Ask me about partners, prices and financing. I look things up in this page's data and explain what it means.</span></div>
-      </div>
-      <div class="marie-log" id="marie-log" hidden></div>
-      <form class="marie-ask" id="marie-form">
-        <label class="sr" for="marie-q">Question for Marie</label>
-        <input id="marie-q" type="text" autocomplete="off" placeholder="e.g. Who is cheapest for a 6 kW single-phase inverter?">
-        <button type="submit" id="marie-send">Ask</button>
-        <button type="button" id="marie-stop" hidden>Stop</button>
-      </form>
-      <div class="marie-sugg" id="marie-sugg"></div>
-      <div class="marie-note" id="marie-note" role="status"></div>
-    </section>
     <div class="refresh" id="refresh" hidden></div>
   </div>
 </header>
@@ -316,6 +317,8 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
 </main>
 
 <footer class="gutter"><div class="wrap" id="foot"></div></footer>
+</div>
+</div>
 
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden aria-modal="true" role="dialog" aria-labelledby="d-name"></aside>
@@ -497,7 +500,11 @@ function mdLite(text) {
   }).map(linkify).join('');
 }
 function marie() {
-  const box = $('#marie'), log = $('#marie-log'), note = $('#marie-note'), form = $('#marie-form'), q = $('#marie-q'), send = $('#marie-send'), stop = $('#marie-stop');
+  const log = $('#marie-log'), note = $('#marie-note'), form = $('#marie-form'), q = $('#marie-q'), send = $('#marie-send'), stop = $('#marie-stop');
+  const avatar = log.querySelector('.pfp').getAttribute('src');
+  const grow = () => { q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, 140) + 'px'; };
+  q.addEventListener('input', grow);
+  q.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); } });
   const SUGG = ['Who is cheapest for a 6 kW single-phase inverter?', 'Which financing partners are live, and on what terms?', 'Which partners need a follow-up this week?', 'Compare battery prices per kWh'];
   $('#marie-sugg').innerHTML = SUGG.map((t) => `<button type="button">${esc(t)}</button>`).join('');
   $('#marie-sugg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { q.value = b.textContent; form.requestSubmit(); } });
@@ -513,10 +520,12 @@ function marie() {
     await ready;
     if (!sample) return off('Marie works when this page is open in claude.ai.');
     if (!canTools) return off('Marie needs to look things up, which this view does not allow. Open the page in claude.ai in a browser.');
-    note.textContent = ''; log.hidden = false; q.value = '';
-    log.insertAdjacentHTML('beforeend', `<div class="turn q">${esc(question)}</div>`);
-    const a = document.createElement('div'); a.className = 'turn a'; a.innerHTML = '<span class="who">Marie</span><div class="busy">Looking at the data…</div>'; log.append(a); log.scrollTop = log.scrollHeight;
-    const body = a.querySelector('.busy');
+    note.textContent = ''; q.value = ''; grow(); $('#marie-sugg').hidden = true;
+    log.insertAdjacentHTML('beforeend', `<div class="turn q"><div class="bubble">${esc(question).replace(/\n/g, '<br>')}</div></div>`);
+    const a = document.createElement('div'); a.className = 'turn a';
+    a.innerHTML = `<img class="pfp" src="${avatar}" alt="Marie" width="32" height="32"><div class="bubble"><div class="busy">Looking at the data…</div></div>`;
+    log.append(a); log.scrollTop = log.scrollHeight;
+    const body = a.querySelector('.bubble > div');
     const turns = history.length ? [...history, { role: 'user', content: question }] : [{ role: 'user', content: MARIE_BRIEF + '\n\nQuestion: ' + question }];
     const tools = MARIE_TOOLS.map((t) => ({ ...t, execute: (input, cx) => { body.className = 'busy'; body.textContent = { overview: 'Counting partners…', search_companies: 'Searching companies…', get_company: 'Opening ' + (input?.name || 'a company') + '…', compare_prices: 'Comparing prices…', financing_overview: 'Reviewing financing partners…' }[t.name]; return t.execute(input || {}, cx); } }));
     ctl = new AbortController(); send.disabled = true; stop.hidden = false;
