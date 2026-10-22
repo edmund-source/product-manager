@@ -1,0 +1,805 @@
+<title>Helios Partner Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky control bar with tabs and FX inputs; each tab is filters, then a chart or pipeline strip, then a sortable table; a side panel opens per partner */
+:root {
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --surface-2: #eef2f0;
+  --fg: #16201c;
+  --muted: #5b6964;
+  --faint: #8a9792;
+  --line: #dbe2df;
+  --accent: #b86e00;       /* sun amber: prices */
+  --accent-soft: #fff1da;
+  --link: #1f6b5a;         /* teal: navigation and selection */
+  --link-soft: #e1f1ec;
+  --series-1: #2a78d6;     /* chart marks */
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101513; --surface: #18201c; --surface-2: #1f2925; --fg: #e5ece9; --muted: #9aa8a3; --faint: #6f7d78;
+    --line: #2b3632; --accent: #f0a63a; --accent-soft: #34270f; --link: #6fcbb3; --link-soft: #15312a;
+    --series-1: #3987e5; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101513; --surface: #18201c; --surface-2: #1f2925; --fg: #e5ece9; --muted: #9aa8a3; --faint: #6f7d78;
+  --line: #2b3632; --accent: #f0a63a; --accent-soft: #34270f; --link: #6fcbb3; --link-soft: #15312a;
+  --series-1: #3987e5; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); color: var(--fg); }
+body { font: 14.5px/1.5 var(--body); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1240px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--display); margin: 0; line-height: 1.15; text-wrap: balance; }
+h1 { font-size: clamp(24px, 3.6vw, 32px); }
+h2 { font-size: 19px; }
+.eyebrow { font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); }
+
+/* header */
+header.top { padding-block: 28px 18px; }
+header.top .wrap { display: grid; gap: 10px; }
+.stamp { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 500 12px/1 var(--mono); padding: 6px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+.lede { color: var(--muted); max-width: 72ch; margin: 0; }
+.refresh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--muted); }
+.refresh button { border: 1px solid var(--link); background: var(--link-soft); color: var(--fg); border-radius: 8px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
+.refresh button:disabled { opacity: .6; cursor: default; }
+.refresh .msg { color: var(--fg); }
+
+/* control bar */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.bar .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding-block: 10px; }
+.tabs { display: flex; gap: 4px; }
+.tab { border: 0; background: transparent; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+.tab .n { font: 500 11px var(--mono); color: var(--faint); margin-left: 4px; }
+.fx { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--muted); }
+.fx label { display: inline-flex; align-items: center; gap: 6px; }
+.fx input[type="number"] { width: 78px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-family: var(--mono); font-size: 12.5px; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+main { padding-block: 22px 64px; }
+section.view { display: grid; gap: 18px; }
+
+/* filters */
+.filters { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.pill { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 13px; color: var(--muted); }
+.pill .n { font: 500 11px var(--mono); color: var(--faint); margin-left: 3px; }
+.pill[aria-pressed="true"] { background: var(--link-soft); border-color: var(--link); color: var(--fg); }
+.pill[aria-pressed="true"] .n { color: var(--link); }
+.search { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-width: 0; width: 220px; max-width: 100%; }
+select.sel { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
+.spacer { flex: 1; }
+.count { color: var(--muted); font-size: 13px; }
+
+/* chart */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 16px 10px; display: grid; gap: 8px; min-width: 0; position: relative; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; }
+.panel-head p { margin: 0; color: var(--muted); font-size: 13px; }
+.chart-wrap { position: relative; overflow-x: auto; }
+.chart-wrap svg { display: block; }
+.chart-empty { color: var(--muted); padding: 18px 2px; font-size: 13.5px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 6px 20px rgb(0 0 0 / .12); max-width: 280px; z-index: 3; }
+.tip b { display: block; font-weight: 600; }
+.tip .more { display: block; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; }
+.chart-wrap svg { cursor: default; }
+.chart-wrap svg.on { cursor: pointer; }
+.tip .v { font-family: var(--mono); color: var(--accent); }
+
+/* tables */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 11.5px/1.3 var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; background: var(--surface); position: sticky; top: 0; }
+th button { all: unset; cursor: pointer; }
+th button:focus-visible { outline: 2px solid var(--link); }
+th .dir { color: var(--link); margin-left: 3px; }
+td.r, th.r { text-align: right; }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+.link { all: unset; cursor: pointer; color: var(--link); font-weight: 600; }
+.link:hover { text-decoration: underline; }
+.link:focus-visible { outline: 2px solid var(--link); }
+.price { font-family: var(--mono); color: var(--accent); white-space: nowrap; }
+.sub { color: var(--muted); font-size: 12px; }
+.tag { display: inline-block; font: 500 11px/1.4 var(--mono); padding: 1px 6px; border-radius: 4px; background: var(--surface-2); color: var(--muted); margin: 1px 2px 1px 0; white-space: nowrap; }
+.tag.file { background: var(--accent-soft); color: var(--accent); }
+.status { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 12.5px; }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+.empty-row td { color: var(--muted); padding: 22px 10px; text-align: center; }
+
+/* pipeline strip */
+#type-filters { display: grid; gap: 8px; }
+.tgroup { display: grid; grid-template-columns: 170px 1fr; gap: 10px; align-items: start; }
+.glabel { all: unset; box-sizing: border-box; cursor: pointer; padding: 6px 10px; border-radius: 8px; font-weight: 600; font-size: 13.5px; border: 1px solid transparent; }
+.glabel .n { font: 500 11px var(--mono); color: var(--faint); margin-left: 5px; }
+.glabel:hover { background: var(--surface-2); }
+.glabel:focus-visible { outline: 2px solid var(--link); }
+.glabel[aria-pressed="true"] { background: var(--link-soft); border-color: var(--link); }
+@media (max-width: 640px) { .tgroup { grid-template-columns: 1fr; gap: 4px; } }
+.pipeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.stage { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; cursor: pointer; text-align: left; display: grid; gap: 2px; }
+.stage .k { font-size: 12px; color: var(--muted); }
+.stage .v { font: 600 22px/1.1 var(--display); }
+.stage[aria-pressed="true"] { border-color: var(--link); background: var(--link-soft); }
+
+/* financing cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; min-width: 0; }
+.card h3 { font-size: 17px; }
+.card p { margin: 0; font-size: 13.5px; }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
+
+/* financing summary */
+.fin-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.fsum { all: unset; box-sizing: border-box; cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 9px; align-content: start; min-width: 0; }
+.fsum:hover { border-color: var(--faint); }
+.fsum:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.fsum[aria-pressed="true"] { border-color: var(--link); box-shadow: inset 0 0 0 1px var(--link); }
+.fsum .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.fsum .h { font: 600 16px/1.2 var(--display); }
+.fsum .big { font: 600 24px/1 var(--display); font-variant-numeric: tabular-nums; }
+.fsum .def { display: block; color: var(--muted); font-size: 12.5px; }
+.fsum .head { display: block; font-size: 13.5px; }
+.stagebar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+.stagebar span { display: block; height: 100%; }
+.stagekey { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.stagekey i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+.stagekey b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.names { display: block; font-size: 12.5px; color: var(--muted); }
+.names b { color: var(--fg); font-weight: 600; }
+
+/* drawer */
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .32); z-index: 20; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(880px, 100%); background: var(--bg); z-index: 21; overflow-y: auto; border-left: 1px solid var(--line);
+  padding-top: max(18px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  padding-left: 20px; padding-right: max(20px, env(safe-area-inset-right, 0px)); display: grid; gap: 16px; align-content: start; }
+.drawer .close { justify-self: end; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 13.5px; margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.drawer h3 { font-size: 15px; }
+.drawer .block { display: grid; gap: 8px; }
+.drawer .summary { margin: 0; font-size: 14px; }
+details.cat { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+details.cat + details.cat { margin-top: 8px; }
+details.cat > summary { cursor: pointer; padding: 10px 12px; font-weight: 600; }
+details.cat > summary .n { font: 500 11px var(--mono); color: var(--faint); margin-left: 4px; }
+details.cat .table-wrap { border: 0; border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; }
+tr.alt td { color: var(--muted); }
+tr.alt .price { color: var(--muted); }
+.files { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 13.5px; }
+.terms { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 13.5px; }
+.next { background: var(--link-soft); border-radius: 8px; padding: 8px 10px; font-size: 13.5px; }
+footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
+@media (prefers-reduced-motion: no-preference) { .drawer { animation: slide .18s ease-out; } @keyframes slide { from { transform: translateX(24px); opacity: .6; } } }
+@media (max-width: 640px) { .search { width: 100%; } .fx { width: 100%; } }
+</style>
+
+<header class="top gutter">
+  <div class="wrap">
+    <span class="eyebrow" id="stampline">Helios · supplier and partner register</span>
+    <h1>Partner explorer</h1>
+    <p class="lede" id="lede"></p>
+    <div class="stamp" id="stamp"></div>
+    <div class="refresh" id="refresh" hidden></div>
+  </div>
+</header>
+
+<div class="bar gutter">
+  <div class="wrap">
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" role="tab" id="tab-partners" aria-controls="partners" aria-selected="true">All<span class="n" id="n-partners"></span></button>
+      <button class="tab" role="tab" id="tab-prices" aria-controls="prices" aria-selected="false">Hardware<span class="n" id="n-prices"></span></button>
+      <button class="tab" role="tab" id="tab-financing" aria-controls="financing" aria-selected="false">Financing<span class="n" id="n-financing"></span></button>
+    </div>
+    <div class="fx">
+      <label for="fx-usd">₱ per USD <input id="fx-usd" type="number" step="0.01" min="0"></label>
+      <label for="fx-cny">₱ per CNY <input id="fx-cny" type="number" step="0.01" min="0"></label>
+      <label class="toggle" for="exvat"><input id="exvat" type="checkbox" checked> Compare ex-VAT</label>
+    </div>
+  </div>
+</div>
+
+<main class="gutter">
+  <div class="wrap">
+
+    <section class="view" id="prices" role="tabpanel" aria-labelledby="tab-prices">
+      <div class="filters" id="cat-filters"></div>
+      <div class="filters" id="size-filters" hidden></div>
+      <div class="filters">
+        <input class="search" id="price-q" type="search" placeholder="Search product, model, seller">
+        <select class="sel" id="price-src" aria-label="Source">
+          <option value="">Email and attachments</option>
+          <option value="email">Email bodies only</option>
+          <option value="attachment">Attachments only</option>
+        </select>
+        <label class="toggle" for="priced-only"><input id="priced-only" type="checkbox" checked> Priced lines only</label>
+        <label class="toggle" for="main-tier" title="Hide SRP, installer or regional tiers the price list's owner did not pick for comparison"><input id="main-tier" type="checkbox" checked> Comparison tier only</label>
+        <span class="spacer"></span>
+        <span class="count" id="price-count"></span>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2 id="chart-title">Price comparison</h2>
+          <p id="chart-note"></p>
+        </div>
+        <div class="chart-wrap" id="chart"></div>
+      </div>
+      <div class="table-wrap"><table id="price-table"></table></div>
+    </section>
+
+    <section class="view" id="partners" role="tabpanel" aria-labelledby="tab-partners" hidden>
+      <div class="pipeline" id="pipeline"></div>
+      <div class="filters" id="type-filters"></div>
+      <div class="filters">
+        <input class="search" id="partner-q" type="search" placeholder="Search name, brand, summary">
+        <select class="sel" id="partner-kind" aria-label="Kind"></select>
+        <label class="toggle" for="solar-only"><input id="solar-only" type="checkbox"> Solar-related only</label>
+        <span class="spacer"></span>
+        <span class="count" id="partner-count"></span>
+      </div>
+      <div class="table-wrap"><table id="partner-table"></table></div>
+    </section>
+
+    <section class="view" id="financing" role="tabpanel" aria-labelledby="tab-financing" hidden>
+      <div class="panel-head"><h2>Financing partners by type</h2><p>Select a type to list its partners below.</p></div>
+      <div class="fin-summary" id="fin-summary"></div>
+      <div class="filters">
+        <div class="seg" id="fin-filters"></div>
+        <span class="spacer"></span>
+        <span class="count" id="fin-count"></span>
+      </div>
+      <div class="table-wrap" id="fin-cards"><table id="fin-table"></table></div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="gutter"><div class="wrap" id="foot"></div></footer>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-modal="true" role="dialog" aria-labelledby="d-name"></aside>
+
+<script id="data" type="application/json">/*DATA*/</script>
+<script>
+(() => {
+const D = JSON.parse(document.getElementById('data').textContent);
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const byId = new Map(D.companies.map((c) => [c.id, c]));
+const store = { get(k, d) { try { const v = localStorage.getItem('hpx:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('hpx:' + k, JSON.stringify(v)); } catch {} } };
+
+const CAT = { inverters: 'Inverters', panels: 'Panels', batteries: 'Batteries', mounting: 'Mounting', bos: 'BOS / electrical',
+  ev_charging: 'EV charging', appliances: 'Appliances', other: 'Other equipment' };
+const EQUIP = Object.keys(CAT);
+const METRIC = { panels: ['w', '₱/W'], batteries: ['kwh', '₱/kWh'], inverters: ['kw', '₱/kW'] };
+// size bands for like-for-like comparison: [key, label, from (inclusive), to (exclusive)]
+const SIZES = {
+  inverters: { field: 'kw', unit: 'kW', bands: [['micro', 'Micro, under 3 kW', 0, 3], ['3.6', '3–4.5 kW', 3, 4.5], ['5', '5 kW', 4.5, 5.5],
+    ['6', '6–6.5 kW', 5.5, 7], ['8', '8 kW', 7, 9], ['10', '10 kW', 9, 11], ['12', '12 kW', 11, 13], ['14', '14 kW and up', 13, Infinity]] },
+  batteries: { field: 'kwh', unit: 'kWh', bands: [['s', 'Under 6 kWh', 0, 6], ['m', '6–12 kWh', 6, 12], ['l', '12–20 kWh', 12, 20], ['xl', 'Over 20 kWh', 20, Infinity]] },
+};
+const sizeOf = (l) => { const z = SIZES[l.cat]; if (!z) return null; const v = l[z.field]; if (!(v > 0)) return 'none'; return (z.bands.find((b) => v >= b[2] && v < b[3]) || [])[0] || 'none'; };
+const STATUS = { cold_inbound: 'Cold inbound', intro: 'Intro', in_discussion: 'In discussion', quoted: 'Quoted', meeting_held: 'Meeting held',
+  accredited: 'Accredited', active_supplier: 'Active supplier', declined: 'Declined', dormant: 'Dormant', unknown: 'Unknown' };
+const STATUS_ORDER = Object.keys(STATUS);
+const STATUS_COLOR = { active_supplier: 'var(--good)', accredited: 'var(--good)', quoted: 'var(--series-1)', meeting_held: 'var(--series-1)',
+  in_discussion: 'var(--series-1)', intro: 'var(--link)', cold_inbound: 'var(--faint)', declined: 'var(--critical)', dormant: 'var(--serious)', unknown: 'var(--faint)' };
+const TYPE = { inverters: 'Inverters', panels: 'Panels', batteries: 'Batteries', mounting: 'Mounting', bos: 'BOS', equipment: 'Equipment',
+  ev_charging: 'EV charging', appliances: 'Appliances', consumer_financing: 'Customer financing', business_financing: 'Financing to Helios',
+  investment: 'Investment', insurance: 'Insurance', payments: 'Payments', software: 'Software', logistics: 'Logistics', services: 'Services',
+  marketing: 'Marketing', events: 'Events', other: 'Other' };
+const FIN_TYPES = ['consumer_financing', 'business_financing', 'investment', 'insurance', 'payments'];
+const TYPE_GROUPS = [
+  ['hardware', 'Hardware', ['inverters', 'panels', 'batteries', 'mounting', 'bos', 'equipment', 'ev_charging', 'appliances']],
+  ['financing', 'Financing', FIN_TYPES],
+  ['other', 'Services and other', ['software', 'logistics', 'services', 'marketing', 'events', 'other']],
+];
+const KIND = { manufacturer: 'Manufacturer', distributor: 'Distributor', wholesaler: 'Wholesaler', installer: 'Installer', service: 'Service',
+  software: 'Software', logistics: 'Logistics', financing: 'Financing', bank: 'Bank', lender: 'Lender', investor: 'Investor', insurer: 'Insurer',
+  event: 'Event', other: 'Other' };
+const gmail = (t) => `https://mail.google.com/mail/?authuser=${encodeURIComponent(D.mailbox)}#all/${encodeURIComponent(t)}`;
+const fmt = (v, d = 0) => v == null || !isFinite(v) ? '—' : v.toLocaleString('en-PH', { minimumFractionDigits: d, maximumFractionDigits: d });
+const peso = (v) => v == null ? '—' : '₱' + fmt(v, v < 100 ? 2 : 0);
+const quoted = (l) => l.price == null ? '—' : l.cur === '%' ? fmt(l.price, 2) + '%' : esc(l.cur) + ' ' + fmt(l.price, l.price < 1 ? 3 : l.price < 100 ? 2 : 0);
+const date = (s) => s ? new Date(s + 'T00:00:00').toLocaleDateString('en-PH', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const statusHtml = (s) => `<span class="status"><i style="background:${STATUS_COLOR[s] || 'var(--faint)'}"></i>${esc(STATUS[s] || s || 'Unknown')}</span>`;
+
+/* state */
+const st = {
+  tab: ['prices', 'partners', 'financing'].includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get('tab', 'partners'),
+  fx: Object.assign({ PHP: 1 }, D.fx, store.get('fx', {})), exvat: store.get('exvat', true),
+  cat: store.get('cat', null), size: {}, basis: {}, phase: 1, pq: '', src: '', pricedOnly: true, mainTier: true, psort: ['avg', 1],
+  types: new Set(), stage: null, fsort: ['stage', -1], kind: '', solar: false, cq: '', csort: ['last', -1], fin: null,
+};
+
+/* derived price per line */
+function norm(l) {
+  const rate = st.fx[l.cur || 'PHP'];
+  if (l.price == null || !rate) return { php: null, per: null };
+  let php = l.price * rate;
+  if (st.exvat && l.vat === true) php /= 1.12;
+  const m = METRIC[l.cat];
+  let per = null;
+  if (m) {
+    if (l.unit === (m[0] === 'w' ? 'watt' : m[0])) per = php;
+    else if (['piece', 'set'].includes(l.unit) && l[m[0]] > 0) per = php / (m[0] === 'w' ? l.w : l[m[0]]);
+  }
+  return { php, per };
+}
+
+/* header */
+function header() {
+  const s = D.stats;
+  $('#stampline').textContent = `Helios · Gmail sweep and supplier price lists · updated ${date(D.generated)}`;
+  $('#lede').textContent = 'Every company selling or pitching to Helios, with the prices and terms from email, attached price lists and the supplier price lists compiled by Tim. Pick a category to compare sellers, open a partner for the full record, or change the exchange rates to re-run the comparison.';
+  $('#stamp').innerHTML = [
+    `${s.companies} companies`, `${s.equipment} equipment`, `${s.financial} financial`,
+    `${s.priced} priced equipment lines`, `${s.files} price files read`,
+  ].map((t) => `<span class="chip">${esc(t)}</span>`).join('');
+  $('#foot').innerHTML = esc(D.footnote);
+  $('#fx-usd').value = st.fx.USD; $('#fx-cny').value = st.fx.CNY; $('#exvat').checked = st.exvat;
+}
+
+/* refresh: fires the weekly update routine through the viewer's Claude Code Remote connector */
+function refreshBar() {
+  const r = D.refresh || {}, box = $('#refresh');
+  if (!r.trigger) return;
+  box.hidden = false;
+  box.innerHTML = `<span>Updated ${date(D.generated)}${r.schedule ? ` · updates automatically ${esc(r.schedule)}` : ''}</span>
+    <button id="refresh-btn" type="button">Refresh now</button><span class="msg" id="refresh-msg" role="status"></span>`;
+  const btn = $('#refresh-btn'), msg = $('#refresh-msg');
+  let mcpNs = null; const ready = window.claude?.use ? claude.use('mcp').then((m) => { mcpNs = m; }) : Promise.resolve();
+  btn.addEventListener('click', async () => {
+    await ready;
+    if (!mcpNs) { msg.textContent = 'Refreshing works when this page is open in claude.ai. You can also ask Claude to run the partner explorer refresh.'; return; }
+    btn.disabled = true; msg.textContent = 'Starting the update…';
+    try {
+      await mcpNs.callTool('Claude Code Remote', 'fire_trigger', { trigger_id: r.trigger });
+      msg.textContent = 'Update started. It sweeps the email since the last update and takes about 30 minutes; this page reloads by itself when the new version is published.';
+    } catch (e) {
+      btn.disabled = false;
+      const code = e?.code;
+      msg.textContent = code === 'server_not_connected' ? 'Add the Claude Code Remote connector in claude.ai Settings → Connectors, then try again.'
+        : code === 'needs_reauth' ? 'Reconnect Claude Code Remote in claude.ai Settings → Connectors, then try again.'
+        : code === 'approval_required' || code === 'not_in_manifest' || code === 'consent_required' ? 'The update needs your approval to use Claude Code Remote. Click Refresh now again and choose Allow.'
+        : code === 'tool_error' ? 'The update could not be started from this account: only the owner of the weekly routine can run it.'
+        : code === 'server_unavailable' || code === 'upstream_error' ? 'Claude Code Remote did not answer. The update may have started; check again in a few minutes before clicking again.'
+        : 'The update could not be started here. Ask Claude to run the partner explorer refresh.';
+    }
+  });
+}
+
+/* tabs */
+function showTab(t) {
+  st.tab = t; store.set('tab', t);
+  for (const id of ['prices', 'partners', 'financing']) {
+    $('#' + id).hidden = id !== t;
+    $('#tab-' + id).setAttribute('aria-selected', String(id === t));
+  }
+}
+
+/* ---------- prices ---------- */
+const equipLines = () => D.lines.filter((l) => EQUIP.includes(l.cat));
+function catFilters() {
+  const lines = equipLines().filter((l) => (!st.pricedOnly || l.price != null) && (!st.mainTier || !l.alt));
+  const counts = {}; for (const l of lines) counts[l.cat] = (counts[l.cat] || 0) + 1;
+  const cats = EQUIP.filter((c) => counts[c]);
+  if (st.cat && !cats.includes(st.cat)) st.cat = null;
+  if (!st.cat) st.cat = ['panels', 'inverters', 'batteries'].find((c) => counts[c]) || cats[0] || null;
+  $('#cat-filters').innerHTML = `<div class="seg">${cats.map((c) =>
+    `<button class="pill" data-cat="${c}" aria-pressed="${c === st.cat}">${esc(CAT[c])}<span class="n">${counts[c]}</span></button>`).join('')}</div>`;
+  const z = SIZES[st.cat], box = $('#size-filters');
+  box.hidden = !z;
+  if (!z) return;
+  const inCat = lines.filter((l) => l.cat === st.cat && (!st.src || l.src === st.src) && (st.cat !== 'inverters' || !st.phase || l.phase === st.phase));
+  const sc = {}; for (const l of inCat) { const k = sizeOf(l); sc[k] = (sc[k] || 0) + 1; }
+  const cur = st.size[st.cat] || '';
+  if (cur && !sc[cur]) st.size[st.cat] = '';
+  const chips = [['', 'All sizes', inCat.length], ...z.bands.filter((b) => sc[b[0]]).map((b) => [b[0], b[1], sc[b[0]]]), ...(sc.none ? [['none', 'Size not stated', sc.none]] : [])];
+  const m = METRIC[st.cat];
+  const ph = {}; if (st.cat === 'inverters') for (const l of lines.filter((l) => l.cat === 'inverters' && (!st.src || l.src === st.src))) ph[l.phase] = (ph[l.phase] || 0) + 1;
+  const phaseHtml = st.cat === 'inverters' ? `<span class="count">Phase</span><div class="seg">${[[1, 'Single', ph[1] || 0], [3, 'Three', ph[3] || 0], [0, 'Both', (ph[1] || 0) + (ph[3] || 0)]].map(([k, t, n]) =>
+    `<button class="pill" data-phase="${k}" aria-pressed="${st.phase === k}">${t}<span class="n">${n}</span></button>`).join('')}</div>` : '';
+  box.innerHTML = phaseHtml + `<span class="count">Size</span><div class="seg">${chips.map(([k, t, n]) =>
+    `<button class="pill" data-size="${k}" aria-pressed="${(st.size[st.cat] || '') === k}">${esc(t)}<span class="n">${n}</span></button>`).join('')}</div>
+    <span class="spacer"></span>
+    <span class="count">Compare by</span><div class="seg">${[['metric', m[1]], ['unit', '₱ per unit']].map(([k, t]) =>
+    `<button class="pill" data-basis="${k}" aria-pressed="${basisOf() === k}">${esc(t)}</button>`).join('')}</div>`;
+}
+// with one size picked, price per unit is the fair comparison; across sizes, per kW / kWh
+const basisOf = () => st.basis[st.cat] || (st.size[st.cat] && st.size[st.cat] !== 'none' ? 'unit' : 'metric');
+function priceRows() {
+  const q = st.pq.toLowerCase();
+  const size = SIZES[st.cat] ? st.size[st.cat] || '' : '';
+  return equipLines().filter((l) => l.cat === st.cat && (!st.pricedOnly || l.price != null) && (!st.src || l.src === st.src)
+    && (!size || sizeOf(l) === size) && (!st.mainTier || !l.alt) && (l.cat !== 'inverters' || !st.phase || l.phase === st.phase)
+    && (!q || [l.name, l.model, byId.get(l.cid)?.name, l.specs].join(' ').toLowerCase().includes(q)))
+    .map((l) => ({ l, c: byId.get(l.cid), ...norm(l) }));
+}
+function chart(rows) {
+  const host = $('#chart');
+  const m0 = METRIC[st.cat];
+  const m = m0 && basisOf() === 'metric' ? m0 : null;
+  const key = m ? 'per' : 'php';
+  const label = m ? m[1] : '₱ per unit';
+  const z = SIZES[st.cat], sz = z && st.size[st.cat];
+  const szLabel = sz ? (z.bands.find((b) => b[0] === sz)?.[1] || 'size not stated') : '';
+  $('#chart-title').textContent = `${CAT[st.cat] || 'Price'}${st.cat === 'inverters' && st.phase ? (st.phase === 3 ? ' · three phase' : ' · single phase') : ''}${szLabel ? ' · ' + szLabel : ''} · ${label}${st.exvat ? ' ex-VAT' : ''}`;
+  const staleTip = host.closest('.panel')?.querySelector('.tip'); if (staleTip) staleTip.hidden = true;
+  const pts = rows.filter((r) => r[key] != null);
+  const skipped = rows.filter((r) => r.php != null && r[key] == null).length;
+  $('#chart-note').textContent = pts.length
+    ? `Each dot is one quoted line; rows are sellers, cheapest first.${(() => { const bs = [...new Set(pts.map((r) => (r.l.basis || 'unknown').toLowerCase()))]; return bs.some((b) => ['fob', 'exw', 'cif'].includes(b)) && bs.length > 1 ? ` Terms differ (${bs.map((b) => b === 'unknown' ? 'not stated' : b.toUpperCase()).join(', ')}): FOB and EXW prices exclude freight and duties.` : ''; })()}${skipped ? ` ${skipped} priced line${skipped > 1 ? 's have' : ' has'} no ${{ w: 'wattage', kwh: 'kWh capacity', kw: 'kW rating' }[m?.[0]] || 'unit'} to place on the chart; see the table.` : ''}`
+    : '';
+  if (!pts.length) { host.innerHTML = `<div class="chart-empty">No ${esc(CAT[st.cat] || '')} lines with a comparable price${st.src ? ' from this source' : ''}. Try another category or source.</div>`; return; }
+  const groups = new Map();
+  for (const r of pts) { const k = r.c?.short || r.c?.name || '—'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+  const sellers = [...groups.entries()].map(([name, rs]) => ({ name, rs, min: Math.min(...rs.map((r) => r[key])) })).sort((a, b) => a.min - b.min);
+  const vals = pts.map((r) => r[key]).sort((a, b) => a - b);
+  const median = vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2;
+  // taller rows, and at least 280px of plot so a category with one or two sellers isn't squashed
+  const W = Math.max(host.clientWidth || 640, 320), rowH = Math.max(46, 280 / sellers.length), padL = Math.min(190, W * 0.36), padR = 24, padT = 32, padB = 34;
+  const H = Math.round(padT + sellers.length * rowH + padB);
+  // the chart keeps its own list: the table below re-sorts `rows` after this runs
+  const P = [];
+  const max = vals[vals.length - 1] * 1.08 || 1;
+  const nice = (v) => { const p = 10 ** Math.floor(Math.log10(v)); const n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
+  const step = nice(max / 5), top = Math.ceil(max / step) * step;
+  const x = (v) => padL + (v / top) * (W - padL - padR);
+  const dp = top < 50 ? 2 : 0;
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)} by seller">`;
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    s += `<line x1="${x(v)}" x2="${x(v)}" y1="${padT - 6}" y2="${H - padB}" stroke="var(--line)" stroke-width="1"/>`;
+    s += `<text x="${x(v)}" y="${H - padB + 18}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="var(--muted)">${fmt(v, dp)}</text>`;
+  }
+  s += `<line x1="${x(median)}" x2="${x(median)}" y1="${padT - 10}" y2="${H - padB}" stroke="var(--accent)" stroke-width="1.5"/>`;
+  s += `<text x="${x(median)}" y="${padT - 14}" text-anchor="${x(median) > W - 120 ? 'end' : 'middle'}" font-size="11" font-family="var(--mono)" fill="var(--accent)">median ${fmt(median, dp)}</text>`;
+  sellers.forEach((g, i) => {
+    const y = padT + i * rowH + rowH / 2;
+    if (i) s += `<line x1="${padL}" x2="${W - padR}" y1="${padT + i * rowH}" y2="${padT + i * rowH}" stroke="var(--line)" stroke-opacity=".6" stroke-width="1"/>`;
+    const maxCh = Math.floor((padL - 14) / 7); const nm = g.name.length > maxCh ? g.name.slice(0, maxCh - 1) + '…' : g.name;
+    s += `<text x="${padL - 10}" y="${y + 4}" text-anchor="end" font-size="12.5" fill="var(--fg)">${esc(nm)}</text>`;
+    const xs = g.rs.map((r) => x(r[key]));
+    if (xs.length > 1) s += `<line x1="${Math.min(...xs)}" x2="${Math.max(...xs)}" y1="${y}" y2="${y}" stroke="var(--series-1)" stroke-opacity=".35" stroke-width="2"/>`;
+    g.rs.forEach((r) => {
+      P.push({ r, cx: x(r[key]), cy: y });
+      s += `<circle cx="${x(r[key])}" cy="${y}" r="6" fill="var(--series-1)" stroke="var(--surface)" stroke-width="2"/>`;
+    });
+  });
+  s += '</svg>';
+  s = s.replace('</svg>', '<circle class="hl" r="10" fill="none" stroke="var(--fg)" stroke-width="2" visibility="hidden"/></svg>');
+  host.innerHTML = s;
+  const panel = host.closest('.panel');
+  let tip = panel.querySelector('.tip');
+  if (!tip) { tip = document.createElement('div'); tip.className = 'tip'; panel.appendChild(tip); }
+  tip.hidden = true;
+  const svg = host.querySelector('svg'), hl = svg.querySelector('.hl');
+  const pick = (e) => {
+    const b = svg.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top;
+    let best = null, bd = Infinity;
+    for (const p of P) { const d = Math.hypot(p.cx - mx, p.cy - my); if (d < bd) { bd = d; best = p; } }
+    if (!best || bd > 18) return null;
+    // quotes that sit on (almost) the same spot are listed together
+    return P.filter((p) => p.cy === best.cy && Math.abs(p.cx - best.cx) < 4);
+  };
+  const line = (r) => `${esc([r.l.name, r.l.model].filter(Boolean).join(' · '))}<br><span class="v">${peso(r[key])}${m ? ' ' + m[1].slice(1) : ''}</span> · ${quoted(r.l)} / ${esc(r.l.unit)}${r.l.moq > 1 ? ` · MOQ ${r.l.moq}` : ''}`;
+  const hide = () => { tip.hidden = true; hl.setAttribute('visibility', 'hidden'); svg.classList.remove('on'); };
+  svg.addEventListener('mousemove', (e) => {
+    const hits = pick(e); if (!hits) return hide();
+    const r = hits[0].r;
+    tip.innerHTML = `<b>${esc(r.c?.name)}</b>${line(r)}<br><span class="sub">${esc(r.l.src === 'attachment' ? r.l.file : 'email')} · ${date(r.l.quoted)}</span>`
+      + (hits.length > 1 ? `<span class="more sub">${hits.length - 1} more quote${hits.length > 2 ? 's' : ''} at about this price: ${hits.slice(1, 4).map((h) => esc(h.r.l.name)).join('; ')}${hits.length > 4 ? '…' : ''}</span>` : '');
+    tip.hidden = false;
+    hl.setAttribute('cx', hits[0].cx); hl.setAttribute('cy', hits[0].cy); hl.setAttribute('visibility', 'visible'); svg.classList.add('on');
+    const pb = panel.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = e.clientX - pb.left + 14; if (left + tw > pb.width - 8) left = e.clientX - pb.left - tw - 14;
+    let top = e.clientY - pb.top + 14; if (top + th > pb.height - 8) top = e.clientY - pb.top - th - 14;
+    tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
+  });
+  svg.addEventListener('mouseleave', hide);
+  svg.addEventListener('click', (e) => { const hits = pick(e); if (hits) openCompany(hits[0].r.l.cid); });
+}
+function priceTable(rows) {
+  // one row per supplier, over the lines the filters leave; line detail lives in the supplier view
+  const m0 = METRIC[st.cat], m = m0 && basisOf() === 'metric' ? m0 : null;
+  const key = m ? 'per' : 'php', unitLabel = m ? m[1] : (st.exvat ? '₱ per unit ex-VAT' : '₱ per unit');
+  const z = SIZES[st.cat];
+  const groups = new Map();
+  for (const r of rows) { if (!groups.has(r.l.cid)) groups.set(r.l.cid, []); groups.get(r.l.cid).push(r); }
+  const sup = [...groups.entries()].map(([cid, rs]) => {
+    const v = rs.map((r) => r[key]).filter((x) => x != null);
+    const sizes = z ? [...new Set(rs.map((r) => r.l[z.field]).filter((x) => x > 0))].sort((a, b) => a - b) : [];
+    return { cid, c: byId.get(cid), rs, n: rs.length, priced: v.length,
+      avg: v.length ? v.reduce((a, b) => a + b, 0) / v.length : null, min: v.length ? Math.min(...v) : null, max: v.length ? Math.max(...v) : null,
+      sizes, bases: [...new Set(rs.map((r) => (r.l.basis || '').toUpperCase()).filter(Boolean))],
+      latest: rs.map((r) => r.l.quoted || '').sort().at(-1) || '',
+      files: rs.filter((r) => r.l.src === 'attachment').length, emails: rs.filter((r) => r.l.src === 'email').length };
+  });
+  const cols = [
+    ['seller', 'Supplier', (g) => (g.c?.short || g.c?.name || '').toLowerCase()],
+    ['n', 'Products', (g) => g.n, 'r'],
+    ['avg', 'Average ' + unitLabel, (g) => g.avg ?? Infinity, 'r'],
+    ['min', 'Lowest', (g) => g.min ?? Infinity, 'r'],
+    ['max', 'Highest', (g) => g.max ?? Infinity, 'r'],
+    ...(z ? [['sizes', 'Sizes (' + z.unit + ')', (g) => g.sizes[0] ?? Infinity]] : []),
+    ['terms', 'Terms', (g) => g.bases.join()],
+    ['latest', 'Latest quote', (g) => g.latest],
+    ['source', 'Source', (g) => g.files - g.emails],
+  ];
+  let [sk, sd] = st.psort; if (!cols.find((c) => c[0] === sk)) { sk = 'avg'; sd = 1; }
+  const get = cols.find((c) => c[0] === sk)[2];
+  sup.sort((a, b) => { const x = get(a), y = get(b); return (x < y ? -1 : x > y ? 1 : 0) * sd; });
+  $('#price-count').textContent = `${sup.length} supplier${sup.length === 1 ? '' : 's'} · ${rows.length} product line${rows.length === 1 ? '' : 's'}`;
+  const dp = (v) => v == null ? '—' : (m ? fmt(v, v < 100 ? 2 : 0) : peso(v));
+  const sizeText = (xs) => xs.length > 6 ? xs.slice(0, 6).map((x) => fmt(x, x % 1 ? 2 : 0)).join(', ') + ` +${xs.length - 6}` : xs.map((x) => fmt(x, x % 1 ? 2 : 0)).join(', ');
+  const head = `<thead><tr>${cols.map(([k, t, , a]) => `<th class="${a || ''}" aria-sort="${k === sk ? (sd > 0 ? 'ascending' : 'descending') : 'none'}"><button data-psort="${k}">${esc(t)}${k === sk ? `<span class="dir">${sd > 0 ? '↑' : '↓'}</span>` : ''}</button></th>`).join('')}</tr></thead>`;
+  const body = sup.length ? sup.map((g) => `<tr>
+      <td><button class="link" data-cid="${g.cid}">${esc(g.c?.short || g.c?.name)}</button><div class="sub">${esc([KIND[g.c?.kind], g.c?.country].filter(Boolean).join(' · '))}</div></td>
+      <td class="r num">${g.n}${g.priced < g.n ? `<div class="sub">${g.priced} priced</div>` : ''}</td>
+      <td class="r"><span class="price">${dp(g.avg)}</span></td>
+      <td class="r num">${dp(g.min)}</td>
+      <td class="r num">${dp(g.max)}</td>
+      ${z ? `<td class="num">${g.sizes.length ? esc(sizeText(g.sizes)) : '<span class="sub">not stated</span>'}</td>` : ''}
+      <td>${g.bases.length ? g.bases.map((b) => `<span class="tag">${esc(b)}</span>`).join('') : '<span class="sub">not stated</span>'}</td>
+      <td class="num" style="white-space:nowrap">${date(g.latest)}</td>
+      <td>${g.files ? `<span class="tag file">${g.files} from price lists</span>` : ''}${g.emails ? `<span class="tag">${g.emails} from email</span>` : ''}</td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="${cols.length}">No suppliers match these filters.</td></tr>`;
+  $('#price-table').innerHTML = head + `<tbody>${body}</tbody>`;
+}
+function renderPrices() { catFilters(); const rows = priceRows(); chart(rows); priceTable(rows); }
+
+/* ---------- partners ---------- */
+function partnerRows(ignoreStage) {
+  const q = st.cq.toLowerCase();
+  return D.companies.filter((c) => (!st.types.size || c.types.some((t) => st.types.has(t)))
+    && (!st.kind || c.kind === st.kind) && (!st.solar || c.solar)
+    && (ignoreStage || !st.stage || c.status === st.stage)
+    && (!q || [c.name, c.brands.join(' '), c.summary, c.domain].join(' ').toLowerCase().includes(q)));
+}
+function renderPartners() {
+  const base = partnerRows(true);
+  const sc = {}; for (const c of base) sc[c.status] = (sc[c.status] || 0) + 1;
+  $('#pipeline').innerHTML = STATUS_ORDER.filter((s) => sc[s]).map((s) =>
+    `<button class="stage" data-stage="${s}" aria-pressed="${st.stage === s}"><span class="k">${statusHtml(s)}</span><span class="v num">${sc[s]}</span></button>`).join('');
+  const tc = {}; for (const c of D.companies) for (const t of c.types) tc[t] = (tc[t] || 0) + 1;
+  // same split as the Hardware and Financing tabs; a group label selects or clears its types
+  $('#type-filters').innerHTML = TYPE_GROUPS.map(([g, label, ts]) => {
+    const present = ts.filter((t) => tc[t]); if (!present.length) return '';
+    const n = D.companies.filter((c) => c.types.some((t) => ts.includes(t))).length;
+    const all = present.every((t) => st.types.has(t));
+    return `<div class="tgroup"><button class="glabel" data-tgroup="${g}" aria-pressed="${all}">${esc(label)}<span class="n">${n}</span></button>
+      <div class="seg">${present.map((t) => `<button class="pill" data-type="${t}" aria-pressed="${st.types.has(t)}">${esc(TYPE[t])}<span class="n">${tc[t]}</span></button>`).join('')}</div></div>`;
+  }).join('');
+  const kinds = [...new Set(D.companies.map((c) => c.kind))].sort();
+  $('#partner-kind').innerHTML = `<option value="">All kinds</option>` + kinds.map((k) => `<option value="${k}" ${k === st.kind ? 'selected' : ''}>${esc(KIND[k] || k)}</option>`).join('');
+  const rows = partnerRows(false);
+  const priced = (c) => D.lines.filter((l) => l.cid === c.id && l.price != null).length;
+  const cols = [['name', 'Company', (c) => c.name.toLowerCase()], ['types', 'Offers', (c) => c.types.join()], ['status', 'Stage', (c) => STATUS_ORDER.indexOf(c.status)],
+    ['prices', 'Prices', priced, 'r'], ['last', 'Last contact', (c) => c.last || '']];
+  let [sk, sd] = st.csort; const get = (cols.find((c) => c[0] === sk) || cols[4])[2];
+  rows.sort((a, b) => { const x = get(a), y = get(b); return (x < y ? -1 : x > y ? 1 : 0) * sd; });
+  $('#partner-count').textContent = `${rows.length} of ${D.companies.length} companies`;
+  $('#partner-table').innerHTML = `<thead><tr>${cols.map(([k, t, , a]) => `<th class="${a || ''}" aria-sort="${k === sk ? (sd > 0 ? 'ascending' : 'descending') : 'none'}"><button data-csort="${k}">${esc(t)}${k === sk ? `<span class="dir">${sd > 0 ? '↑' : '↓'}</span>` : ''}</button></th>`).join('')}</tr></thead><tbody>` +
+    (rows.length ? rows.map((c) => `<tr>
+      <td><button class="link" data-cid="${c.id}">${esc(c.name)}</button><div class="sub">${esc([KIND[c.kind], c.country, c.ph && 'PH: ' + c.ph].filter(Boolean).join(' · '))}</div>
+        ${c.brands.length ? `<div class="sub">Brands: ${esc(c.brands.slice(0, 6).join(', '))}${c.brands.length > 6 ? '…' : ''}</div>` : ''}</td>
+      <td>${c.types.map((t) => `<span class="tag">${esc(TYPE[t] || t)}</span>`).join('')}</td>
+      <td>${statusHtml(c.status)}${c.next ? `<div class="sub">${esc(c.next.length > 90 ? c.next.slice(0, 89) + '…' : c.next)}</div>` : ''}</td>
+      <td class="r num">${priced(c) || '—'}</td>
+      <td class="num" style="white-space:nowrap">${date(c.last)}</td></tr>`).join('')
+      : `<tr class="empty-row"><td colspan="5">No companies match these filters.</td></tr>`) + '</tbody>';
+}
+
+/* ---------- stage evidence ---------- */
+const VERDICT = { confirmed: ['Confirmed', 'var(--good)'], inferred: ['Inferred', 'var(--warning)'], not_supported: ['Not supported', 'var(--critical)'] };
+const verdictHtml = (v) => v && VERDICT[v] ? `<span class="status"><i style="background:${VERDICT[v][1]};border-radius:2px"></i>${VERDICT[v][0]}</span>` : '<span class="sub">Not checked</span>';
+function basisCell(c) {
+  const e = c.evidence; if (!e) return verdictHtml(null);
+  const m = e.emails[0];
+  return `${verdictHtml(e.verdict)}${m ? `<div><a class="sub" href="${gmail(m.thread_id)}" target="_blank" rel="noopener">Email · ${date(m.date)}</a></div>` : ''}${e.contracts.length ? `<div>${e.contracts.slice(0, 2).map((f) => `<span class="tag file" title="${esc(f.filename)}">${esc(f.filename.length > 24 ? f.filename.slice(0, 23) + '…' : f.filename)}</span>`).join('')}${e.contracts.length > 2 ? `<span class="sub"> +${e.contracts.length - 2}</span>` : ''}</div>` : ''}${e.suggested ? `<div class="sub">Emails suggest: ${esc(STATUS[e.suggested] || e.suggested)}</div>` : ''}`;
+}
+function evidenceBlock(c) {
+  const e = c.evidence; if (!e) return '';
+  return `<div class="block"><h3>Why this stage</h3>
+    <div>${statusHtml(c.status)} · ${verdictHtml(e.verdict)}</div>
+    ${e.basis ? `<p class="summary">${esc(e.basis)}</p>` : ''}
+    ${e.suggested ? `<div class="next">The emails point to a different stage: ${esc(STATUS[e.suggested] || e.suggested)}.</div>` : ''}
+    ${e.emails.length ? `<ul class="files">${e.emails.map((m) => `<li><a href="${gmail(m.thread_id)}" target="_blank" rel="noopener">${esc(m.subject || 'Email')}</a> <span class="sub">${date(m.date)}${m.from_domain ? ' · ' + esc(m.from_domain) : ''}</span>${m.shows ? `<div class="sub">${esc(m.shows)}</div>` : ''}</li>`).join('')}</ul>` : ''}
+    ${e.contracts.length ? `<div>${e.contracts.map((f) => `<a class="tag file" href="${gmail(f.thread_id)}" target="_blank" rel="noopener" title="Open the email carrying this file">${esc(f.filename)}</a>`).join(' ')}</div>` : ''}
+  </div>`;
+}
+
+/* ---------- financing ---------- */
+const GROUPS = [
+  ['live', 'Live', ['active_supplier', 'accredited'], 'var(--good)'],
+  ['adv', 'Advanced', ['meeting_held', 'in_discussion', 'quoted'], 'var(--series-1)'],
+  ['early', 'Early', ['intro', 'cold_inbound', 'unknown'], 'var(--faint)'],
+  ['closed', 'Declined or dormant', ['declined', 'dormant'], 'var(--serious)'],
+];
+const groupOf = (s) => (GROUPS.find((g) => g[2].includes(s)) || GROUPS[2])[0];
+function finSummary(fin) {
+  const info = D.finSummary || {};
+  $('#fin-summary').innerHTML = FIN_TYPES.map((t) => {
+    const cs = fin.filter((c) => c.types.includes(t));
+    if (!cs.length) return '';
+    const n = {}; for (const c of cs) { const g = groupOf(c.status); n[g] = (n[g] || 0) + 1; }
+    const live = cs.filter((c) => groupOf(c.status) === 'live').map((c) => c.short || c.name);
+    const adv = cs.filter((c) => groupOf(c.status) === 'adv').sort((a, b) => (b.last || '').localeCompare(a.last || '')).map((c) => c.short || c.name);
+    const list = (xs) => xs.length > 5 ? esc(xs.slice(0, 5).join(', ')) + ` +${xs.length - 5}` : esc(xs.join(', '));
+    return `<button class="fsum" data-fin="${t}" aria-pressed="${st.fin === t}">
+      <span class="top"><span class="h">${esc(TYPE[t])}</span><span class="big">${cs.length}</span></span>
+      ${info[t]?.def ? `<span class="def">${esc(info[t].def)}</span>` : ''}
+      <span class="stagebar" aria-hidden="true">${GROUPS.filter((g) => n[g[0]]).map((g) => `<span style="flex:${n[g[0]]};background:${g[3]}"></span>`).join('')}</span>
+      <span class="stagekey">${GROUPS.filter((g) => n[g[0]]).map((g) => `<span><i style="background:${g[3]}"></i>${esc(g[1])} <b>${n[g[0]]}</b></span>`).join('')}</span>
+      ${info[t]?.headline ? `<span class="head">${esc(info[t].headline)}</span>` : ''}
+      ${live.length ? `<span class="names"><b>Live:</b> ${list(live)}</span>` : ''}
+      ${adv.length ? `<span class="names"><b>Advanced:</b> ${list(adv)}</span>` : ''}
+    </button>`;
+  }).join('');
+}
+function renderFinancing() {
+  const fin = D.companies.filter((c) => c.types.some((t) => FIN_TYPES.includes(t)));
+  const tc = {}; for (const c of fin) for (const t of c.types) if (FIN_TYPES.includes(t)) tc[t] = (tc[t] || 0) + 1;
+  $('#fin-filters').innerHTML = [['', 'All', fin.length], ...FIN_TYPES.filter((t) => tc[t]).map((t) => [t, TYPE[t], tc[t]])].map(([k, t, n]) =>
+    `<button class="pill" data-fin="${k}" aria-pressed="${(st.fin || '') === k}">${esc(t)}<span class="n">${n}</span></button>`).join('');
+  finSummary(fin);
+  const rows = fin.filter((c) => !st.fin || c.types.includes(st.fin));
+  const gi = (c) => ['closed', 'early', 'adv', 'live'].indexOf(groupOf(c.status));
+  const cols = [
+    ['name', 'Partner', (c) => c.name.toLowerCase()], ['type', 'Type', (c) => c.types.filter((t) => FIN_TYPES.includes(t)).join()],
+    ['stage', 'Stage', (c) => gi(c) * 100 + STATUS_ORDER.indexOf(c.status)], ['intro', 'Introduced by', (c) => (c.intro || '~').toLowerCase()],
+    ['basis', 'Basis', (c) => ['confirmed', 'inferred', 'not_supported'].indexOf(c.evidence?.verdict ?? 'zz')],
+    ['last', 'Last contact', (c) => c.last || ''], ['next', 'Next step', (c) => (c.next || '~').toLowerCase()],
+  ];
+  const [sk, sd] = st.fsort, get = (cols.find((c) => c[0] === sk) || cols[2])[2];
+  rows.sort((a, b) => { const x = get(a), y = get(b); return (x < y ? -1 : x > y ? 1 : 0) * sd || (b.last || '').localeCompare(a.last || ''); });
+  $('#fin-count').textContent = `${rows.length} partner${rows.length === 1 ? '' : 's'} · open one for terms and history`;
+  const gl = Object.fromEntries(GROUPS.map((g) => [g[0], g[1]]));
+  $('#fin-table').innerHTML = `<thead><tr>${cols.map(([k, t]) => `<th aria-sort="${k === sk ? (sd > 0 ? 'ascending' : 'descending') : 'none'}"><button data-fsort="${k}">${esc(t)}${k === sk ? `<span class="dir">${sd > 0 ? '↑' : '↓'}</span>` : ''}</button></th>`).join('')}</tr></thead><tbody>` +
+    (rows.length ? rows.map((c) => `<tr>
+      <td><button class="link" data-cid="${c.id}">${esc(c.short || c.name)}</button><div class="sub">${esc(KIND[c.kind] || c.kind)}${c.country ? ' · ' + esc(c.country) : ''}</div></td>
+      <td>${c.types.filter((t) => FIN_TYPES.includes(t)).map((t) => `<span class="tag">${esc(TYPE[t])}</span>`).join('')}</td>
+      <td>${statusHtml(c.status)}<div class="sub">${esc(gl[groupOf(c.status)])}</div></td>
+      <td>${esc(c.intro || '—')}</td>
+      <td>${basisCell(c)}</td>
+      <td class="num" style="white-space:nowrap">${date(c.last)}</td>
+      <td>${c.next ? esc(c.next.length > 110 ? c.next.slice(0, 109) + '…' : c.next) : '<span class="sub">—</span>'}</td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="${cols.length}">No partners of this type.</td></tr>`) + '</tbody>';
+}
+
+/* ---------- drawer ---------- */
+let lastFocus = null;
+function openCompany(id) {
+  const c = byId.get(id); if (!c) return;
+  lastFocus = document.activeElement;
+  const lines = D.lines.filter((l) => l.cid === id).map((l) => ({ l, ...norm(l) }));
+  const d = $('#drawer');
+  d.innerHTML = `
+    <button class="close" id="d-close">Close</button>
+    <div class="block"><span class="eyebrow">${esc(KIND[c.kind] || c.kind)}${c.solar ? '' : ' · not solar'}</span><h2 id="d-name">${esc(c.name)}</h2>
+      <div>${statusHtml(c.status)}</div></div>
+    ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ''}
+    ${c.next ? `<div class="next">Next: ${esc(c.next)}</div>` : ''}
+    ${evidenceBlock(c)}
+    <dl class="facts">
+      ${c.domain ? `<dt>Website</dt><dd><a href="https://${esc(c.domain)}" target="_blank" rel="noopener">${esc(c.domain)}</a></dd>` : ''}
+      ${c.country ? `<dt>Country</dt><dd>${esc(c.country)}</dd>` : ''}
+      ${c.ph ? `<dt>In the PH</dt><dd>${esc(c.ph)}</dd>` : ''}
+      <dt>Offers</dt><dd>${c.types.map((t) => `<span class="tag">${esc(TYPE[t] || t)}</span>`).join('')}</dd>
+      ${c.brands.length ? `<dt>Brands</dt><dd>${esc(c.brands.join(', '))}</dd>` : ''}
+      ${c.intro ? `<dt>Introduced by</dt><dd>${esc(c.intro)}</dd>` : ''}
+      <dt>Contact</dt><dd>${date(c.first)} to ${date(c.last)}</dd>
+      ${c.contacts.length ? `<dt>People</dt><dd>${c.contacts.map((p) => esc([p.name, p.title].filter(Boolean).join(', '))).join('<br>')}</dd>` : ''}
+    </dl>
+    ${lines.length && !lines.some((r) => EQUIP.includes(r.l.cat)) ? `<div class="block"><h3>Products and terms</h3><ul class="terms">${lines.map((r) => `<li><b>${esc(r.l.name)}</b>${r.l.price != null ? ` · <span class="price">${quoted(r.l)}</span>` : ''}${r.l.notes ? `<div class="sub">${esc(r.l.notes)}</div>` : ''}<div class="sub">${r.l.src === 'attachment' ? esc(r.l.file) : 'email'}${r.l.quoted ? ' · ' + date(r.l.quoted) : ''}</div></li>`).join('')}</ul></div>` : ''}
+    ${lines.some((r) => EQUIP.includes(r.l.cat)) ? `<div class="block"><h3>Products and prices <span class="sub">${lines.filter((r) => EQUIP.includes(r.l.cat)).length} lines</span></h3>
+      <div class="filters"><div class="seg" id="d-cats"></div></div>
+      <div class="filters"><input class="search" id="d-q" type="search" placeholder="Search this supplier's products">
+        <label class="toggle" for="d-tier"><input id="d-tier" type="checkbox" ${st.mainTier ? 'checked' : ''}> Comparison tier only</label>
+        <span class="spacer"></span><span class="count" id="d-count"></span></div>
+      <div class="table-wrap"><table id="d-table"></table></div></div>` : ''}
+    ${c.attachments.length ? `<div class="block"><h3>Price lists and files <span class="sub">${c.attachments.length}</span></h3><ul class="files">${c.attachments.map((f) => {
+        const info = (D.files || {})[f] || {}, n = lines.filter((r) => r.l.file === f).length;
+        return `<li><span class="tag file">${esc(f)}</span>${info.date ? ` <span class="sub">${date(info.date)}</span>` : ''}${n ? ` <span class="sub">· ${n} line${n === 1 ? '' : 's'}</span>` : info.status && info.status.startsWith('unreadable') ? ' <span class="sub">· not read (too large)</span>' : ''}
+          ${info.thread ? ` <a class="sub" href="${gmail(info.thread)}" target="_blank" rel="noopener">Open email</a>` : ''}
+          ${info.terms ? `<div class="sub">${esc(info.terms)}</div>` : ''}${info.notes && !info.thread ? `<div class="sub">${esc(info.notes)}</div>` : ''}</li>`;
+      }).join('')}</ul></div>` : ''}
+    ${c.threads.length ? `<div class="block"><h3>Email threads <span class="sub">${c.threads.length}</span></h3><div>${c.threads.map((t, i) => `<a href="${gmail(t)}" target="_blank" rel="noopener" class="tag">Thread ${i + 1}</a>`).join(' ')}</div><span class="sub">Opens in Gmail for edmund@joinhelios.com.</span></div>` : ''}`;
+  d.hidden = false; $('#scrim').hidden = false;
+  if (lines.some((r) => EQUIP.includes(r.l.cat))) {
+    // open on the category being compared, if this supplier sells it
+    const cats = EQUIP.filter((k) => lines.some((r) => r.l.cat === k));
+    dv = { lines, cats, cat: cats.includes(st.cat) ? st.cat : cats[0], q: '', tier: st.mainTier };
+    $('#d-q').addEventListener('input', (e) => { dv.q = e.target.value; drawerProducts(); });
+    $('#d-tier').addEventListener('change', (e) => { dv.tier = e.target.checked; drawerProducts(); });
+    drawerProducts();
+  }
+  $('#d-close').focus();
+}
+// the supplier view's product table: one category at a time
+let dv = null;
+function drawerProducts() {
+  const { lines, cats } = dv;
+  const shown = (r) => !dv.tier || !r.l.alt;
+  $('#d-cats').innerHTML = cats.map((k) => `<button class="pill" data-dcat="${k}" aria-pressed="${k === dv.cat}">${esc(CAT[k])}<span class="n">${lines.filter((r) => r.l.cat === k && shown(r)).length}</span></button>`).join('');
+  const k = dv.cat, z = SIZES[k], mm = METRIC[k], q = dv.q.toLowerCase();
+  const rs = lines.filter((r) => r.l.cat === k && shown(r) && (!q || [r.l.name, r.l.model, r.l.specs].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => (a.l.alt - b.l.alt) || ((a.l[z?.field] || 0) - (b.l[z?.field] || 0)) || ((a.php ?? 1e12) - (b.php ?? 1e12)));
+  const moq = rs.some((r) => r.l.moq > 1);
+  const hidden = lines.filter((r) => r.l.cat === k && !shown(r)).length;
+  $('#d-count').textContent = `${rs.length} product${rs.length === 1 ? '' : 's'}${hidden ? ` · ${hidden} other-tier prices hidden` : ''}`;
+  $('#d-table').innerHTML = `<thead><tr><th>Product</th>${z ? `<th class="r">${z.unit}</th>` : ''}<th class="r">${st.exvat ? '₱ ex-VAT' : '₱'}</th>${mm ? `<th class="r">${mm[1]}</th>` : ''}${moq ? '<th class="r">MOQ</th>' : ''}<th>Source</th></tr></thead><tbody>` +
+    (rs.length ? rs.map((r) => `<tr class="${r.l.alt ? 'alt' : ''}"><td>${esc(r.l.name)}${r.l.model ? `<div class="sub mono">${esc(r.l.model)}</div>` : ''}${r.l.tier ? `<span class="tag">${esc(r.l.tier)}${r.l.alt ? ' · not compared' : ''}</span>` : ''}${r.l.notes ? `<div class="sub" title="${esc(r.l.notes)}">${esc(r.l.notes.length > 120 ? r.l.notes.slice(0, 119) + '…' : r.l.notes)}</div>` : ''}</td>
+      ${z ? `<td class="r num">${r.l[z.field] ? fmt(r.l[z.field], r.l[z.field] % 1 ? 2 : 0) : '—'}</td>` : ''}
+      <td class="r"><span class="price">${peso(r.php)}</span><div class="sub mono">${quoted(r.l)}${r.l.cur === '%' ? '' : ' / ' + esc(r.l.unit)}</div></td>
+      ${mm ? `<td class="r num">${r.per != null ? fmt(r.per, 2) : '—'}</td>` : ''}
+      ${moq ? `<td class="r num">${r.l.moq > 1 ? fmt(r.l.moq) : '1'}</td>` : ''}
+      <td><span class="sub">${r.l.src === 'attachment' ? esc(r.l.file) : 'email'}${r.l.quoted ? ' · ' + date(r.l.quoted) : ''}</span>${r.l.thread ? `<div><a class="sub" href="${gmail(r.l.thread)}" target="_blank" rel="noopener">Open thread</a></div>` : ''}</td></tr>`).join('')
+      : `<tr class="empty-row"><td colspan="6">No products match.</td></tr>`) + '</tbody>';
+}
+function closeDrawer() { $('#drawer').hidden = true; $('#scrim').hidden = true; lastFocus?.focus?.(); }
+
+/* ---------- events ---------- */
+function renderAll() { renderPrices(); renderPartners(); renderFinancing(); }
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button, [data-cid]'); if (!t) return;
+  if (t.id === 'd-close') return closeDrawer();
+  if (t.dataset.dcat) { dv.cat = t.dataset.dcat; return drawerProducts(); }
+  if (t.dataset.cid) return openCompany(t.dataset.cid);
+  if ('phase' in t.dataset) { st.phase = +t.dataset.phase; return renderPrices(); }
+  if ('size' in t.dataset) { st.size[st.cat] = t.dataset.size; delete st.basis[st.cat]; st.psort = ['avg', 1]; return renderPrices(); }
+  if (t.dataset.basis) { st.basis[st.cat] = t.dataset.basis; st.psort = ['avg', 1]; return renderPrices(); }
+  if (t.dataset.cat) { st.cat = t.dataset.cat; store.set('cat', st.cat); st.psort = ['avg', 1]; return renderPrices(); }
+  if (t.dataset.psort) { const k = t.dataset.psort; st.psort = [k, st.psort[0] === k ? -st.psort[1] : (['n', 'latest', 'source'].includes(k) ? -1 : 1)]; return renderPrices(); }
+  if (t.dataset.fsort) { const k = t.dataset.fsort; st.fsort = [k, st.fsort[0] === k ? -st.fsort[1] : (k === 'last' || k === 'stage' ? -1 : 1)]; return renderFinancing(); }
+  if (t.dataset.csort) { const k = t.dataset.csort; st.csort = [k, st.csort[0] === k ? -st.csort[1] : (k === 'last' || k === 'prices' ? -1 : 1)]; return renderPartners(); }
+  if (t.dataset.stage) { st.stage = st.stage === t.dataset.stage ? null : t.dataset.stage; return renderPartners(); }
+  if (t.dataset.tgroup) {
+    const ts = TYPE_GROUPS.find((g) => g[0] === t.dataset.tgroup)[2].filter((x) => D.companies.some((c) => c.types.includes(x)));
+    const all = ts.every((x) => st.types.has(x));
+    for (const x of ts) all ? st.types.delete(x) : st.types.add(x);
+    return renderPartners();
+  }
+  if (t.dataset.type) { st.types.has(t.dataset.type) ? st.types.delete(t.dataset.type) : st.types.add(t.dataset.type); return renderPartners(); }
+  if ('fin' in t.dataset) { const f = t.dataset.fin || null; st.fin = t.classList.contains('fsum') && st.fin === f ? null : f; renderFinancing(); if (t.classList.contains('fsum')) $('#fin-cards').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return; }
+  if (t.getAttribute('role') === 'tab') { showTab(t.id.replace('tab-', '')); if (st.tab === 'prices') chart(priceRows()); return; }
+});
+$('#scrim').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#drawer').hidden) closeDrawer(); });
+$('#price-q').addEventListener('input', (e) => { st.pq = e.target.value; renderPrices(); });
+$('#price-src').addEventListener('change', (e) => { st.src = e.target.value; renderPrices(); });
+$('#priced-only').addEventListener('change', (e) => { st.pricedOnly = e.target.checked; renderPrices(); });
+$('#main-tier').addEventListener('change', (e) => { st.mainTier = e.target.checked; renderPrices(); });
+$('#partner-q').addEventListener('input', (e) => { st.cq = e.target.value; renderPartners(); });
+$('#partner-kind').addEventListener('change', (e) => { st.kind = e.target.value; renderPartners(); });
+$('#solar-only').addEventListener('change', (e) => { st.solar = e.target.checked; renderPartners(); });
+for (const [id, cur] of [['#fx-usd', 'USD'], ['#fx-cny', 'CNY']]) {
+  $(id).addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v > 0) { st.fx[cur] = v; store.set('fx', { USD: st.fx.USD, CNY: st.fx.CNY }); renderPrices(); } });
+}
+$('#exvat').addEventListener('change', (e) => { st.exvat = e.target.checked; store.set('exvat', st.exvat); renderPrices(); });
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (st.tab === 'prices') chart(priceRows()); }, 150); });
+
+$('#n-prices').textContent = D.stats.priced; $('#n-partners').textContent = D.companies.length;
+$('#n-financing').textContent = D.companies.filter((c) => c.types.some((t) => FIN_TYPES.includes(t))).length;
+header(); refreshBar(); showTab(st.tab); renderAll();
+})();
+</script>

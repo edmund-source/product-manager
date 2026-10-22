@@ -69,3 +69,12 @@ documents are replaced.
 To (re)build the extract, run `/supplier-sweep` in Claude Code inside this
 repo (`/supplier-sweep 2026/10/22` sweeps only newer mail). See
 `.claude/skills/supplier-sweep/SKILL.md`.
+
+## Partner explorer
+
+The partner explorer is a private claude.ai artifact built from the extracts
+by `scripts/explorer/build.py` (page template in `scripts/explorer/template.html`).
+A weekly routine refreshes it with only the mail since the last update; see
+`.claude/skills/explorer-refresh/SKILL.md`. The artifact stores its own data
+under `state/` with contact details removed (`scripts/explorer/scrub-state.py`),
+and `scripts/merge-incremental.mjs` folds each week's delta into it.
