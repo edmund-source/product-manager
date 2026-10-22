@@ -19,6 +19,15 @@ const BASES = ['exw', 'fob', 'cif', 'ddp', 'delivered', 'retail', 'wholesale'];
 const UNITS = ['piece', 'set', 'watt', 'kwh', 'meter', 'roll', 'box'];
 const NON_EQUIPMENT_KINDS = ['logistics', 'financing', 'bank', 'lender', 'investor', 'insurer',
   'payments', 'software', 'event'];
+// Extract categories are free text ("inverter", "battery/solar kit", "payment fee").
+const EQUIPMENT_CATEGORY_ALIASES = {
+  inverter: 'inverters', microinverter: 'inverters', panel: 'panels', module: 'panels', modules: 'panels',
+  battery: 'batteries', battery_solar_kit: 'batteries', portable_power_station: 'batteries', bess: 'batteries',
+  racking: 'mounting', ev_charger: 'ev_charging', ev_chargers: 'ev_charging', appliance: 'appliances',
+  solar_pump: 'other',
+};
+const EQUIPMENT_CATEGORIES = ['inverters', 'panels', 'batteries', 'mounting', 'bos', 'ev_charging',
+  'appliances', 'equipment', 'other'];
 const PARTNER_TYPE_ALIASES = {
   inverter: 'inverters', panel: 'panels', modules: 'panels', pv_modules: 'panels',
   battery: 'batteries', bess: 'batteries', energy_storage: 'batteries',
@@ -166,7 +175,11 @@ for (const c of companies) {
     // like are kept out (they belong in financing_terms or elsewhere).
     const sellsEquipment = !NON_EQUIPMENT_KINDS.includes(c.kind);
     for (const p of c.products ?? []) {
-      if (!sellsEquipment || p.category === 'financing') continue;
+      // Fees, rates and services stay out, and so do lines whose price is a
+      // percentage (no currency): pricing reads every price as money.
+      const category = p.category ? EQUIPMENT_CATEGORY_ALIASES[slug(p.category)] ?? slug(p.category) : null;
+      if (!sellsEquipment || (category && !EQUIPMENT_CATEGORIES.includes(category))) continue;
+      if (p.price != null && !p.currency) continue;
       const currency = (p.currency ?? 'PHP').slice(0, 3).toUpperCase();
       const basis = oneOf(String(p.price_basis ?? '').toLowerCase(), BASES, 'unknown');
       const vat = typeof p.vat_included === 'boolean' ? p.vat_included : null;
