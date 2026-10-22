@@ -1,7 +1,7 @@
 // Merges prices read from email attachments (data/attachment_prices.json, one
 // object per file) into the Gmail supplier extract, so `import:gmail` loads
 // them as partner price lists. Each file is matched to a company by thread,
-// message, sender domain or sender email; files that match nobody become a
+// message, sender domain, sender email or company name; files that match nobody become a
 // new company entry. Safe to re-run: attachment lines are replaced.
 //
 //   node scripts/merge-attachment-prices.mjs data/suppliers_from_gmail.json \
@@ -35,7 +35,8 @@ const findCompany = (d) => {
     ?? (domain && !FREE_MAIL.includes(domain)
       ? companies.find((c) => lower(c.website_domain)?.replace(/^www\./, '') === domain)
       : undefined)
-    ?? (email ? companies.find((c) => (c.contacts ?? []).some((p) => lower(p.email) === email)) : undefined);
+    ?? (email ? companies.find((c) => (c.contacts ?? []).some((p) => lower(p.email) === email)) : undefined)
+    ?? (d.company ? companies.find((c) => lower(c.company) === lower(d.company)) : undefined);
 };
 
 const stats = { files: docs.length, matched: 0, added_companies: 0, lines: 0, priced: 0 };
@@ -49,11 +50,11 @@ for (const d of docs) {
     c = {
       company: d.company ?? d.sender_email ?? d.filename,
       website_domain: domain && !FREE_MAIL.includes(domain) ? domain : null,
-      kind: 'other', solar_related: true, partner_types: [], brands: [], products: [],
+      kind: d.kind ?? 'other', country: d.country ?? null, solar_related: true, partner_types: [], brands: [], products: [],
       contacts: d.sender_email ? [{ name: null, title: null, email: d.sender_email }] : [],
       status: 'quoted', first_contact: d.message_date ?? null, last_contact: d.message_date ?? null,
       thread_ids: d.thread_id ? [d.thread_id] : [], has_attachments: [],
-      summary: `Found only through the attachment ${d.filename}.`,
+      summary: d.thread_id ? `Found only through the attachment ${d.filename}.` : `Known from the price list ${d.filename}.`,
     };
     companies.push(c);
     stats.added_companies++;
