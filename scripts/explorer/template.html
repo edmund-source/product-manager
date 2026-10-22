@@ -529,7 +529,7 @@ function marie() {
     const tools = MARIE_TOOLS.map((t) => ({ ...t, execute: (input, cx) => { body.className = 'busy'; body.textContent = { overview: 'Counting partners…', search_companies: 'Searching companies…', get_company: 'Opening ' + (input?.name || 'a company') + '…', compare_prices: 'Comparing prices…', financing_overview: 'Reviewing financing partners…' }[t.name]; return t.execute(input || {}, cx); } }));
     ctl = new AbortController(); send.disabled = true; stop.hidden = false;
     try {
-      const res = await sample(turns, { tools, signal: ctl.signal, modelTier: 'default', onText: ({ text }) => { body.className = ''; body.innerHTML = mdLite(text); log.scrollTop = log.scrollHeight; } });
+      const res = await sample(turns, { tools, signal: ctl.signal, model: 'claude-opus-5-5', modelTier: 'complex', effort: 'low', onText: ({ text }) => { body.className = ''; body.innerHTML = mdLite(text); log.scrollTop = log.scrollHeight; } });
       body.className = ''; body.innerHTML = mdLite(res.text) + (res.truncated ? '<p class="sub">Cut short. Ask for less at a time.</p>' : '');
       history.splice(0, history.length, ...turns, { role: 'assistant', content: res.text });
       while (history.length > 12) history.splice(1, 2); // keep the brief and recent turns
