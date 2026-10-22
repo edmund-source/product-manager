@@ -74,6 +74,8 @@ repo (`/supplier-sweep 2026/10/22` sweeps only newer mail). See
 
 The partner explorer is a private claude.ai artifact built from the extracts
 by `scripts/explorer/build.py` (page template in `scripts/explorer/template.html`).
+Marie, the page's chat assistant, follows the plain-text instructions in
+`scripts/explorer/marie.md`; edit that file to change how she answers.
 A weekly routine refreshes it with only the mail since the last update; see
 `.claude/skills/explorer-refresh/SKILL.md`. The artifact stores its own data
 under `state/` with contact details removed (`scripts/explorer/scrub-state.py`),

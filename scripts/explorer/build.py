@@ -192,7 +192,10 @@ tpl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template.ht
 import base64
 avatar_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'marie-avatar.webp')
 avatar = base64.b64encode(open(avatar_file, 'rb').read()).decode() if os.path.exists(avatar_file) else ''
-open(out, 'w').write(tpl.replace('/*DATA*/', blob).replace('AVATAR_B64', avatar))
+marie_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'marie.md')
+marie = re.sub(r'<!--.*?-->', '', open(marie_file).read(), flags=re.S).strip()
+marie = json.dumps(marie, ensure_ascii=False).replace('</', '<\\/')
+open(out, 'w').write(tpl.replace('/*DATA*/', blob).replace('AVATAR_B64', avatar).replace("/*MARIE*/''", marie))
 placed = {k: sum(1 for l in lines if l['cat'] == k and l['price'] is not None and (l[m] or l['unit'] == u)) for k, m, u in [('panels', 'w', 'watt'), ('batteries', 'kwh', 'kwh'), ('inverters', 'kw', 'kw')]}
 priced = {k: sum(1 for l in lines if l['cat'] == k and l['price'] is not None) for k in placed}
 print(json.dumps({'out': out, 'bytes': os.path.getsize(out), **data['stats'], 'lines': len(lines), 'placed_on_chart': placed, 'priced_by_cat': priced}))
