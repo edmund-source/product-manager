@@ -25,7 +25,12 @@ REGISTER = {
     'FIREFLY Solar (FELCO)': ('FIREFLY Solar (FELCO)', None, 'distributor', 'Philippines'),
     'Goodwell': ('Goodwell Energy Phil Tech Corporation', None, 'distributor', 'Philippines'),
 }
-CATEGORY = {'Inverter': 'inverters', 'Solar Panel': 'panels', 'Battery': 'batteries', 'Mounting': 'mounting'}
+CATEGORY = {'Inverter': 'inverters', 'Solar Panel': 'panels', 'Battery': 'batteries', 'Mounting': 'mounting',
+            'EV Charger': 'ev_charging',
+            # kits, portable stations and tools stay out of the electrical and per-kW comparisons
+            'Energy Storage System': 'other', 'Portable Power Station': 'other', 'Equipment / Tools': 'other'}
+# Prices the transcription had to guess: loaded without a price until the supplier confirms.
+HOLD = {('IAN Solar', 'S6-EH3P30K-H-LV'): "printed as '259,00' on the list; 259,000 was a guess"}
 UNIT = {'pc': 'piece', 'pcs': 'piece', 'set': 'set', 'pair': 'set', 'mtr': 'meter', 'roll': 'roll', 'kwh': 'kwh', 'box': 'box'}
 
 
@@ -35,9 +40,16 @@ def price_basis(text):
         return 'exw'
     if 'free delivery' in t or 'delivered' in t:
         return 'delivered'
-    if 'srp' in t:
+    if 'srp' in t and 'tiers' not in t:  # an SRP-only list; multi-tier lists just mention SRP
         return 'retail'
     return None
+
+
+def product_name(brand, text):
+    # descriptions often start with the brand already ("SUNGROW 6.0kW hybrid")
+    if not brand or (text or '').lower().startswith(brand.split(' (')[0].lower()):
+        return text or brand or 'Unnamed'
+    return f'{brand} {text}' if text else brand
 
 
 suppliers = {r['supplier']: r for r in csv.DictReader(open(suppliers_file, encoding='utf-8-sig'))}
@@ -51,6 +63,9 @@ for r in csv.DictReader(open(quotes_file, encoding='utf-8-sig')):
     except ValueError:
         skipped.append((r['supplier'], r['model'], r['price_quoted']))
         continue
+    held = HOLD.get((r['supplier'], r['model']))
+    if held:
+        price = None
     key = (r['supplier'], r['source_file'], r['quote_date'])
     if key not in docs:
         docs[key] = {
@@ -63,11 +78,12 @@ for r in csv.DictReader(open(quotes_file, encoding='utf-8-sig')):
             'notes': f"From the COO's supplier price-list folder; transcribed {r['ingest_date']}. Price validity: {r['price_validity'] or 'not stated'}.",
         }
     tier = r['price_tier'] if r['price_tier'] not in ('', 'Standard', 'List') else ''
+    list_tier = r['price_tier'] == 'List' and 'List' not in (sup.get('default_tiers') or '')
     default_tiers = (sup.get('default_tiers') or 'Standard').split('|')
     size = f"{r['size_value']} {r['size_unit']}".strip() if r['size_value'] else ''
     unit_raw = r['unit'].lower().split(' ')[0]
     docs[key]['products'].append({
-        'name': ' '.join(x for x in [r['brand'], r['description'] or r['model']] if x)[:200] + (f' ({tier})' if tier else ''),
+        'name': product_name(r['brand'], r['description'] or r['model'])[:200] + (f' ({tier})' if tier else ''),
         'model': r['model'] or None, 'brand': r['brand'] or None,
         'category': CATEGORY.get(r['category'], 'bos'),
         'specs': '; '.join(x for x in [size, r['description']] if x) or None,
@@ -77,6 +93,8 @@ for r in csv.DictReader(open(quotes_file, encoding='utf-8-sig')):
         'vat_included': True if r['vat_basis'] == 'inc' else None,
         'notes': '; '.join(x for x in [
             f"tier: {r['price_tier']}" + ('' if r['price_tier'] in default_tiers or not tier else ' (not the default comparison tier)') if tier else '',
+            'tier: List (not the default comparison tier)' if list_tier else '',
+            held and f'price held: {held}',
             f"category: {r['category']}", r['availability'], r['packing'] and f"packing: {r['packing']}",
             r['notes'], r['flag'] and f"flag: {r['flag']}",
         ] if x) or None,

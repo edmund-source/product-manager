@@ -64,8 +64,10 @@ for (const d of docs) {
     c.thread_ids = [...(c.thread_ids ?? []), d.thread_id];
   }
   for (const p of d.products ?? []) {
+    // rebates and marketing incentives are not equipment prices
+    const category = /rebate|incentive/i.test(p.name ?? '') ? 'service' : p.category ?? null;
     c.products.push({
-      name: p.name, model: p.model ?? null, category: p.category ?? null,
+      name: p.name, model: p.model ?? null, category,
       price: p.price ?? null, currency: p.currency ?? d.currency ?? null,
       price_basis: p.price_basis ?? d.price_basis ?? null,
       vat_included: p.vat_included ?? d.vat_included ?? null,
