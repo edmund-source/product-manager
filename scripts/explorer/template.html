@@ -218,8 +218,7 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
 
 <header class="top gutter">
   <div class="wrap">
-    <span class="eyebrow" id="stampline">Helios · supplier and partner register</span>
-    <h1>Partner explorer</h1>
+    <h1 class="sr">Helios partner explorer</h1>
     <section class="marie" id="marie" aria-label="Ask Marie">
       <div class="marie-head">
         <svg class="avatar" viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
@@ -393,7 +392,6 @@ function norm(l) {
 /* header */
 function header() {
   const s = D.stats;
-  $('#stampline').textContent = `Helios · Gmail sweep and supplier price lists · updated ${date(D.generated)}`;
   $('#foot').innerHTML = esc(D.footnote);
   $('#fx-usd').value = st.fx.USD; $('#fx-cny').value = st.fx.CNY; $('#exvat').checked = st.exvat;
 }
