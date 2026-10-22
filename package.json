@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
-    "import:gmail": "node --env-file-if-exists=.env scripts/import-gmail-suppliers.mjs"
+    "import:gmail": "node --env-file-if-exists=.env scripts/import-gmail-suppliers.mjs",
+    "report:prices": "node --env-file-if-exists=.env scripts/price-summary.mjs"
   },
   "dependencies": {
     "pg": "^8.23.1"

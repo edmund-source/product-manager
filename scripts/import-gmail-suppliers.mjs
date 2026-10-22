@@ -16,6 +16,7 @@ const KINDS = ['manufacturer', 'distributor', 'wholesaler', 'installer', 'servic
 const STATUSES = ['cold_inbound', 'intro', 'in_discussion', 'quoted', 'meeting_held',
   'accredited', 'active_supplier', 'declined', 'dormant', 'unknown'];
 const BASES = ['exw', 'fob', 'cif', 'ddp', 'delivered', 'retail', 'wholesale'];
+const UNITS = ['piece', 'set', 'watt', 'kwh', 'meter', 'roll', 'box'];
 const PARTNER_TYPE_ALIASES = {
   inverter: 'inverters', panel: 'panels', modules: 'panels', pv_modules: 'panels',
   battery: 'batteries', bess: 'batteries', energy_storage: 'batteries',
@@ -155,28 +156,35 @@ for (const c of companies) {
       [companyId, c.thread_ids ?? []],
     );
 
-    // One price list per currency and price basis; each product is a line.
+    // One price list per quote (thread, date, currency, basis, VAT); each
+    // product is a line.
     const lists = new Map();
     for (const p of c.products ?? []) {
       const currency = (p.currency ?? 'PHP').slice(0, 3).toUpperCase();
       const basis = oneOf(String(p.price_basis ?? '').toLowerCase(), BASES, 'unknown');
-      const key = `${currency}|${basis}`;
+      const vat = typeof p.vat_included === 'boolean' ? p.vat_included : null;
+      const ref = p.thread_id ?? c.thread_ids?.[0] ?? null;
+      const quotedOn = p.quoted_on ?? c.last_contact ?? null;
+      const key = [ref, quotedOn, currency, basis, vat].join('|');
       if (!lists.has(key)) {
         const r = await client.query(
           `insert into pricing.price_lists (source_type, company_id, external_ref, currency,
-             price_basis, quoted_on)
-           values ('partner_email',$1,$2,$3,$4,coalesce($5::date, current_date)) returning id`,
-          [companyId, c.thread_ids?.[0] ?? null, currency, basis, c.last_contact ?? null],
+             price_basis, vat_included, quoted_on)
+           values ('partner_email',$1,$2,$3,$4,$5,coalesce($6::date, current_date)) returning id`,
+          [companyId, ref, currency, basis, vat, quotedOn],
         );
         lists.set(key, r.rows[0].id);
       }
       const name = [p.name, p.model].filter(Boolean).join(' — ') || 'unnamed';
       await client.query(
         `insert into pricing.equipment_prices (price_list_id, raw_product_name, raw_model_code,
-           price, notes)
-         values ($1,$2,$3,$4,$5)`,
+           price, unit, min_qty, notes)
+         values ($1,$2,$3,$4,$5,$6,$7)`,
         [lists.get(key), name, p.model ?? null, p.price ?? null,
-          [p.category && `category: ${p.category}`, p.notes].filter(Boolean).join('; ') || null],
+          oneOf(String(p.unit ?? '').toLowerCase(), UNITS, 'piece'),
+          Number.isInteger(p.min_qty) && p.min_qty > 0 ? p.min_qty : 1,
+          [p.category && `category: ${p.category}`, p.specs, p.notes]
+            .filter(Boolean).join('; ') || null],
       );
       counts.prices++;
     }
