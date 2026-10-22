@@ -52,6 +52,11 @@ h2 { font-size: 19px; }
 /* header */
 header.top { padding-block: 16px 10px; }
 header.top .wrap { display: grid; gap: 10px; }
+.logo { display: block; height: 32px; width: auto; }
+.logo-w { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo-b { display: none; } :root:not([data-theme="light"]) .logo-w { display: block; } }
+:root[data-theme="dark"] .logo-b { display: none; }
+:root[data-theme="dark"] .logo-w { display: block; }
 .stamp { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { font: 500 12px/1 var(--mono); padding: 6px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
 .lede { color: var(--muted); max-width: 72ch; margin: 0; }
@@ -242,6 +247,8 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
 <header class="top gutter">
   <div class="wrap">
     <h1 class="sr">Helios partner explorer</h1>
+    <img class="logo logo-b" src="data:image/webp;base64,LOGO_B_B64" alt="Helios" width="126" height="32">
+    <img class="logo logo-w" src="data:image/webp;base64,LOGO_W_B64" alt="Helios" width="126" height="32">
     <div class="refresh" id="refresh" hidden></div>
   </div>
 </header>
