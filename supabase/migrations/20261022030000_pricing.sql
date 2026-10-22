@@ -79,7 +79,7 @@ create table pricing.equipment_prices (
   raw_product_name  text not null,     -- as the seller wrote it
   raw_model_code    text,
   hyperion_sku_code text,              -- Hyperion rows; matched to a product automatically
-  price             numeric(14,2),     -- null = product quoted, price not stated (e.g. in a PDF)
+  price             numeric(14,4),     -- 4 dp for per-watt quotes; null = price not stated (e.g. in a PDF)
   unit              text not null default 'piece' check (unit in
                       ('piece','set','watt','kwh','meter','roll','box')),
   min_qty           integer not null default 1,   -- volume tiers: one row per tier

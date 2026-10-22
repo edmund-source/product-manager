@@ -17,6 +17,8 @@ const STATUSES = ['cold_inbound', 'intro', 'in_discussion', 'quoted', 'meeting_h
   'accredited', 'active_supplier', 'declined', 'dormant', 'unknown'];
 const BASES = ['exw', 'fob', 'cif', 'ddp', 'delivered', 'retail', 'wholesale'];
 const UNITS = ['piece', 'set', 'watt', 'kwh', 'meter', 'roll', 'box'];
+const NON_EQUIPMENT_KINDS = ['logistics', 'financing', 'bank', 'lender', 'investor', 'insurer',
+  'payments', 'software', 'event'];
 const PARTNER_TYPE_ALIASES = {
   inverter: 'inverters', panel: 'panels', modules: 'panels', pv_modules: 'panels',
   battery: 'batteries', bess: 'batteries', energy_storage: 'batteries',
@@ -159,7 +161,11 @@ for (const c of companies) {
     // One price list per quote (thread, date, currency, basis, VAT); each
     // product is a line.
     const lists = new Map();
+    // pricing holds equipment only: financing terms, logistics fees and the
+    // like are kept out (they belong in financing_terms or elsewhere).
+    const sellsEquipment = !NON_EQUIPMENT_KINDS.includes(c.kind);
     for (const p of c.products ?? []) {
+      if (!sellsEquipment || p.category === 'financing') continue;
       const currency = (p.currency ?? 'PHP').slice(0, 3).toUpperCase();
       const basis = oneOf(String(p.price_basis ?? '').toLowerCase(), BASES, 'unknown');
       const vat = typeof p.vat_included === 'boolean' ? p.vat_included : null;
