@@ -29,3 +29,7 @@ ids). `data/` is git-ignored because it contains contact details.
 
 Re-running is safe: companies, brands and contacts are upserted, and the
 email-sourced offers, interactions and documents are replaced.
+
+To (re)build the extract, run `/supplier-sweep` in Claude Code inside this
+repo (`/supplier-sweep 2026/10/22` sweeps only newer mail). See
+`.claude/skills/supplier-sweep/SKILL.md`.
