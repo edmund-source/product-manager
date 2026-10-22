@@ -1,7 +1,8 @@
 // Loads the supplier list extracted from Gmail (see data/suppliers_from_gmail.json)
 // into the register. Safe to re-run: companies, brands and contacts are
-// upserted; offers, interactions and documents that came from email are
-// replaced per company on each run.
+// upserted; prices (pricing.price_lists with source 'partner_email'),
+// interactions and documents that came from email are replaced per company
+// on each run.
 //
 //   DATABASE_URL=... node scripts/import-gmail-suppliers.mjs data/suppliers_from_gmail.json
 import { readFile } from 'node:fs/promises';
@@ -15,6 +16,9 @@ const KINDS = ['manufacturer', 'distributor', 'wholesaler', 'installer', 'servic
 const STATUSES = ['cold_inbound', 'intro', 'in_discussion', 'quoted', 'meeting_held',
   'accredited', 'active_supplier', 'declined', 'dormant', 'unknown'];
 const BASES = ['exw', 'fob', 'cif', 'ddp', 'delivered', 'retail', 'wholesale'];
+const UNITS = ['piece', 'set', 'watt', 'kwh', 'meter', 'roll', 'box'];
+const NON_EQUIPMENT_KINDS = ['logistics', 'financing', 'bank', 'lender', 'investor', 'insurer',
+  'payments', 'software', 'event'];
 const PARTNER_TYPE_ALIASES = {
   inverter: 'inverters', panel: 'panels', modules: 'panels', pv_modules: 'panels',
   battery: 'batteries', bess: 'batteries', energy_storage: 'batteries',
@@ -46,7 +50,7 @@ const toPartnerType = (t) => {
   return partnerTypeKeys.has(k) ? k : 'other';
 };
 
-let counts = { companies: 0, contacts: 0, offers: 0, documents: 0, interactions: 0 };
+let counts = { companies: 0, contacts: 0, prices: 0, documents: 0, interactions: 0 };
 for (const c of companies) {
   await client.query('begin');
   try {
@@ -144,25 +148,51 @@ for (const c of companies) {
     }
 
     // Email-sourced rows are owned by this import: replace them.
-    await client.query("delete from offers where company_id=$1 and source='email'", [companyId]);
+    await client.query(
+      "delete from pricing.price_lists where company_id=$1 and source_type='partner_email'",
+      [companyId],
+    );
     await client.query("delete from interactions where company_id=$1 and channel='email'", [companyId]);
     await client.query(
       'delete from documents where company_id=$1 and gmail_thread_id = any($2)',
       [companyId, c.thread_ids ?? []],
     );
 
+    // One price list per quote (thread, date, currency, basis, VAT); each
+    // product is a line.
+    const lists = new Map();
+    // pricing holds equipment only: financing terms, logistics fees and the
+    // like are kept out (they belong in financing_terms or elsewhere).
+    const sellsEquipment = !NON_EQUIPMENT_KINDS.includes(c.kind);
     for (const p of c.products ?? []) {
+      if (!sellsEquipment || p.category === 'financing') continue;
+      const currency = (p.currency ?? 'PHP').slice(0, 3).toUpperCase();
+      const basis = oneOf(String(p.price_basis ?? '').toLowerCase(), BASES, 'unknown');
+      const vat = typeof p.vat_included === 'boolean' ? p.vat_included : null;
+      const ref = p.thread_id ?? c.thread_ids?.[0] ?? null;
+      const quotedOn = p.quoted_on ?? c.last_contact ?? null;
+      const key = [ref, quotedOn, currency, basis, vat].join('|');
+      if (!lists.has(key)) {
+        const r = await client.query(
+          `insert into pricing.price_lists (source_type, company_id, external_ref, currency,
+             price_basis, vat_included, quoted_on)
+           values ('partner_email',$1,$2,$3,$4,$5,coalesce($6::date, current_date)) returning id`,
+          [companyId, ref, currency, basis, vat, quotedOn],
+        );
+        lists.set(key, r.rows[0].id);
+      }
       const name = [p.name, p.model].filter(Boolean).join(' — ') || 'unnamed';
       await client.query(
-        `insert into offers (company_id, raw_product_name, price, currency, price_basis,
-           source, source_ref, observed_on, notes)
-         values ($1,$2,$3,$4,$5,'email',$6,coalesce($7::date, current_date),$8)`,
-        [companyId, name, p.price ?? null, (p.currency ?? 'PHP').slice(0, 3).toUpperCase(),
-          oneOf(String(p.price_basis ?? '').toLowerCase(), BASES, 'unknown'),
-          c.thread_ids?.[0] ?? null, c.last_contact ?? null,
-          [p.category && `category: ${p.category}`, p.notes].filter(Boolean).join('; ') || null],
+        `insert into pricing.equipment_prices (price_list_id, raw_product_name, raw_model_code,
+           price, unit, min_qty, notes)
+         values ($1,$2,$3,$4,$5,$6,$7)`,
+        [lists.get(key), name, p.model ?? null, p.price ?? null,
+          oneOf(String(p.unit ?? '').toLowerCase(), UNITS, 'piece'),
+          Number.isInteger(p.min_qty) && p.min_qty > 0 ? p.min_qty : 1,
+          [p.category && `category: ${p.category}`, p.specs, p.notes]
+            .filter(Boolean).join('; ') || null],
       );
-      counts.offers++;
+      counts.prices++;
     }
 
     for (const t of new Set(c.thread_ids ?? [])) {
