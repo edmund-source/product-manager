@@ -52,9 +52,19 @@ ids). `data/` is git-ignored because it contains contact details.
 
     pnpm import:gmail data/suppliers_from_gmail.json
 
+Prices read from attachments (PDF / XLSX price lists, one object per file in
+`data/attachment_prices.json`) are merged in first, and load as
+`partner_price_list` lists that name their file:
+
+    pnpm merge:attachments data/suppliers_from_gmail.json data/attachment_prices.json data/suppliers_merged.json
+    pnpm import:gmail data/suppliers_merged.json
+
+`scripts/extract-gmail-attachments.py` turns a Gmail RAW message into files
+and text (pdftotext, XLSX, DOCX) under `data/attachments/`.
+
 Re-running is safe: companies, brands and contacts are upserted, and the
-email-sourced prices (`partner_email`), interactions and documents are
-replaced.
+email-sourced prices (`partner_email`, `partner_price_list`), interactions and
+documents are replaced.
 
 To (re)build the extract, run `/supplier-sweep` in Claude Code inside this
 repo (`/supplier-sweep 2026/10/22` sweeps only newer mail). See

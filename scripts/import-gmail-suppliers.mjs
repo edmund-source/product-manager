@@ -1,8 +1,8 @@
 // Loads the supplier list extracted from Gmail (see data/suppliers_from_gmail.json)
 // into the register. Safe to re-run: companies, brands and contacts are
-// upserted; prices (pricing.price_lists with source 'partner_email'),
-// interactions and documents that came from email are replaced per company
-// on each run.
+// upserted; prices (pricing.price_lists with source 'partner_email', or
+// 'partner_price_list' for lines read from an attachment), interactions and
+// documents that came from email are replaced per company on each run.
 //
 //   DATABASE_URL=... node scripts/import-gmail-suppliers.mjs data/suppliers_from_gmail.json
 import { readFile } from 'node:fs/promises';
@@ -149,7 +149,8 @@ for (const c of companies) {
 
     // Email-sourced rows are owned by this import: replace them.
     await client.query(
-      "delete from pricing.price_lists where company_id=$1 and source_type='partner_email'",
+      `delete from pricing.price_lists where company_id=$1
+         and source_type in ('partner_email','partner_price_list')`,
       [companyId],
     );
     await client.query("delete from interactions where company_id=$1 and channel='email'", [companyId]);
@@ -158,8 +159,8 @@ for (const c of companies) {
       [companyId, c.thread_ids ?? []],
     );
 
-    // One price list per quote (thread, date, currency, basis, VAT); each
-    // product is a line.
+    // One price list per quote (thread, file, date, currency, basis, VAT);
+    // each product is a line.
     const lists = new Map();
     // pricing holds equipment only: financing terms, logistics fees and the
     // like are kept out (they belong in financing_terms or elsewhere).
@@ -171,13 +172,16 @@ for (const c of companies) {
       const vat = typeof p.vat_included === 'boolean' ? p.vat_included : null;
       const ref = p.thread_id ?? c.thread_ids?.[0] ?? null;
       const quotedOn = p.quoted_on ?? c.last_contact ?? null;
-      const key = [ref, quotedOn, currency, basis, vat].join('|');
+      // p.source is "email body" or "attachment: <filename>".
+      const file = /^attachment:\s*/i.test(p.source ?? '') ? p.source.replace(/^attachment:\s*/i, '') : null;
+      const key = [ref, file, quotedOn, currency, basis, vat].join('|');
       if (!lists.has(key)) {
         const r = await client.query(
           `insert into pricing.price_lists (source_type, company_id, external_ref, currency,
-             price_basis, vat_included, quoted_on)
-           values ('partner_email',$1,$2,$3,$4,$5,coalesce($6::date, current_date)) returning id`,
-          [companyId, ref, currency, basis, vat, quotedOn],
+             price_basis, vat_included, quoted_on, valid_until, notes)
+           values ($1,$2,$3,$4,$5,$6,coalesce($7::date, current_date),$8,$9) returning id`,
+          [file ? 'partner_price_list' : 'partner_email', companyId, ref, currency, basis, vat,
+            quotedOn, p.valid_until ?? null, file && `file: ${file}`],
         );
         lists.set(key, r.rows[0].id);
       }

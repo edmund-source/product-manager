@@ -5,6 +5,7 @@
   "scripts": {
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "import:gmail": "node --env-file-if-exists=.env scripts/import-gmail-suppliers.mjs",
+    "merge:attachments": "node scripts/merge-attachment-prices.mjs",
     "report:prices": "node --env-file-if-exists=.env scripts/price-summary.mjs"
   },
   "dependencies": {
