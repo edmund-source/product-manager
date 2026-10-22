@@ -11,15 +11,17 @@ const file = process.argv[2] ?? 'data/suppliers_from_gmail.json';
 const companies = JSON.parse(await readFile(file, 'utf8'));
 
 const KINDS = ['manufacturer', 'distributor', 'wholesaler', 'installer', 'service',
-  'software', 'logistics', 'financing', 'event', 'other'];
+  'software', 'logistics', 'financing', 'bank', 'lender', 'investor', 'insurer', 'event', 'other'];
 const STATUSES = ['cold_inbound', 'intro', 'in_discussion', 'quoted', 'meeting_held',
   'accredited', 'active_supplier', 'declined', 'dormant', 'unknown'];
 const BASES = ['exw', 'fob', 'cif', 'ddp', 'delivered', 'retail', 'wholesale'];
-const CATEGORY_ALIASES = {
+const PARTNER_TYPE_ALIASES = {
   inverter: 'inverters', panel: 'panels', modules: 'panels', pv_modules: 'panels',
   battery: 'batteries', bess: 'batteries', energy_storage: 'batteries',
-  racking: 'mounting', ev_charger: 'ev_charging', ev_chargers: 'ev_charging',
-  saas: 'software', event: 'events', service: 'services', finance: 'financing',
+  racking: 'mounting', ats: 'bos', consumables: 'bos', ev_charger: 'ev_charging',
+  ev_chargers: 'ev_charging', saas: 'software', event: 'events', service: 'services',
+  financing: 'consumer_financing', finance: 'consumer_financing', loans: 'consumer_financing',
+  debt: 'business_financing', lending: 'business_financing', equity: 'investment',
 };
 
 const oneOf = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
@@ -37,11 +39,11 @@ const docKind = (name) => {
 
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();
-const { rows: catRows } = await client.query('select key from product_categories');
-const categoryKeys = new Set(catRows.map((r) => r.key));
-const toCategory = (c) => {
-  const k = CATEGORY_ALIASES[slug(c)] ?? slug(c);
-  return categoryKeys.has(k) ? k : 'other';
+const { rows: ptRows } = await client.query('select key from partner_types');
+const partnerTypeKeys = new Set(ptRows.map((r) => r.key));
+const toPartnerType = (t) => {
+  const k = PARTNER_TYPE_ALIASES[slug(t)] ?? slug(t);
+  return partnerTypeKeys.has(k) ? k : 'other';
 };
 
 let counts = { companies: 0, contacts: 0, offers: 0, documents: 0, interactions: 0 };
@@ -82,10 +84,12 @@ for (const c of companies) {
     }
     counts.companies++;
 
-    for (const cat of new Set((c.categories ?? []).map(toCategory))) {
+    // partner_types is the tagging; older extracts only had categories.
+    const types = c.partner_types?.length ? c.partner_types : (c.categories ?? []);
+    for (const t of new Set(types.map(toPartnerType))) {
       await client.query(
-        'insert into company_categories values ($1,$2) on conflict do nothing',
-        [companyId, cat],
+        'insert into company_partner_types values ($1,$2) on conflict do nothing',
+        [companyId, t],
       );
     }
 
