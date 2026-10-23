@@ -76,6 +76,12 @@ The partner explorer is a private claude.ai artifact built from the extracts
 by `scripts/explorer/build.py` (page template in `scripts/explorer/template.html`).
 Marie, the page's chat assistant, follows the plain-text instructions in
 `scripts/explorer/marie.md`; edit that file to change how she answers.
+She can also search and read the owner's Gmail, Drive and Google Chat, and
+propose email drafts, Chat messages and business-card partners. Nothing is
+saved or sent until the owner clicks the card's button. Saved cards wait in the
+artifact's private `cards` store until the next refresh loads them
+(`scripts/cards-to-suppliers.mjs`) as `potential_partner`. Only the artifact's
+owner can use her.
 A weekly routine refreshes it with only the mail since the last update; see
 `.claude/skills/explorer-refresh/SKILL.md`. The artifact stores its own data
 under `state/` with contact details removed (`scripts/explorer/scrub-state.py`),

@@ -13,7 +13,7 @@ const companies = JSON.parse(await readFile(file, 'utf8'));
 
 const KINDS = ['manufacturer', 'distributor', 'wholesaler', 'installer', 'service',
   'software', 'logistics', 'financing', 'bank', 'lender', 'investor', 'insurer', 'event', 'other'];
-const STATUSES = ['cold_inbound', 'intro', 'in_discussion', 'quoted', 'meeting_held',
+const STATUSES = ['potential_partner', 'cold_inbound', 'intro', 'in_discussion', 'quoted', 'meeting_held',
   'accredited', 'active_supplier', 'declined', 'dormant', 'unknown'];
 const BASES = ['exw', 'fob', 'cif', 'ddp', 'delivered', 'retail', 'wholesale'];
 const UNITS = ['piece', 'set', 'watt', 'kwh', 'meter', 'roll', 'box'];

@@ -52,10 +52,27 @@ file when large), decode them into `data/`, and run
 Record the new `modifiedTime` in the manifest. Otherwise keep the stored
 `coo_pricelists.json`.
 
+## 3b. Business cards saved on the page
+
+Edmund saves business cards through Marie into the artifact's private `cards`
+collection (contact details live only there, never in the page or `state/`).
+Load `ArtifactData` (ToolSearch) and `list` (or `query`) collection `cards` on
+the artifact URL; write the documents to `data/cards.json` (an array; plain
+objects or `{id, data}`), then
+
+```bash
+node scripts/cards-to-suppliers.mjs data/cards.json data/delta_cards.json
+```
+
+New companies come in as `potential_partner`; a card that Marie matched to a
+company already in the list (`matched_company`) only adds its people, brands
+and partner types. Keep the list of card ids for step 6.
+
 ## 4. Merge
 
 ```bash
 node scripts/merge-incremental.mjs suppliers data/suppliers_from_gmail.json data/delta_suppliers.json data/suppliers_from_gmail.json
+node scripts/merge-incremental.mjs suppliers data/suppliers_from_gmail.json data/delta_cards.json data/suppliers_from_gmail.json
 node scripts/merge-incremental.mjs files data/attachment_prices.json data/delta_attachments.json data/attachment_prices.json
 jq -s 'add' data/attachment_prices.json data/coo_pricelists.json > data/all_price_files.json
 node scripts/merge-attachment-prices.mjs data/suppliers_from_gmail.json data/all_price_files.json data/suppliers_merged.json
@@ -99,9 +116,15 @@ connector), and `files`:
 `state/stage_evidence.json` → `data/state_evidence.json`,
 `state/fin_summary.json` → `data/fin_summary.json`.
 
+After the publish succeeds, mark each loaded card with one `ArtifactData`
+`batch` of `update`s on `cards/<id>`: `{loaded: true, loaded_on: <today>}`.
+If `DATABASE_URL` points at the live database in this session, also run
+`pnpm import:gmail data/suppliers_merged.json` so the cards reach Supabase;
+otherwise say in the report that they are in the explorer only.
+
 ## 7. Report
 
-One short summary: the window swept, new companies, companies with new mail,
+One short summary: the window swept, cards loaded, new companies, companies with new mail,
 new priced lines, stage changes or new suggestions, files that could not be
 read. If nothing new arrived, still republish (the "Updated" date moves) and
 say so.
