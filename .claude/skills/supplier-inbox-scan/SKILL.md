@@ -137,6 +137,11 @@ hour. The argument names the phase: `classify` or `extract`.
 2. Read the Saved tab (`Saved!A2:M`). Work on rows whose column M is blank.
    Map each row's company to a `company_id` via the Folders tab (column D),
    falling back to `select scanner_companies()` by name.
+   Some files were read straight from Gmail before the Apps Script copied
+   them (documents whose `drive_file_id` is `gmail:<message_id>/<file name>`):
+   `select drive_file_id from documents where drive_file_id like 'gmail:%'`.
+   Skip Saved rows matching one of those (same message id and file name) and
+   set their column M to `read earlier from Gmail`.
 3. If there are any, give one `general-purpose` subagent (model `sonnet`) the
    rows (file_id, file_name, company, company_id, thread_id, message_date) and this brief:
 
