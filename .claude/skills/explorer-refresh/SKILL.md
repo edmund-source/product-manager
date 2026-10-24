@@ -21,7 +21,7 @@ it.
    then `action: "read"` with `paths`: `state/manifest.json`,
    `state/suppliers_from_gmail.json`, `state/attachment_prices.json`,
    `state/coo_pricelists.json`, `state/stage_evidence.json`,
-   `state/fin_summary.json`. Keep the default `out_dir` (saving elsewhere asks
+   `state/fin_summary.json`, `state/sinosure.json`. Keep the default `out_dir` (saving elsewhere asks
    the person) and copy each saved file into `data/` under the same name.
 3. From `data/manifest.json`: `last_sweep` (YYYY-MM-DD), `trigger_id`,
    `schedule`, `coo_folder_id`, `coo_quotes_modified`. The sweep window starts
@@ -97,9 +97,16 @@ emails only).
 
 ## 6. Rebuild and republish
 
+Sinosure tab: with the Supabase connector (`execute_sql`, project
+`ihqgczwnlauxrieatsug`), read
+`select coalesce(jsonb_agg(t), '[]') from (select c.name, c.website_domain::text as domain, c.country, s.sinosure_evidence, s.evidence_note, s.evidence_url, s.evidence_date, s.policy_status, s.limit_status, s.limit_amount_usd, s.payment_terms_days, s.premium_rate_pct, s.asked_on, s.next_follow_up_on, s.notes, s.updated_at from supplier_trade_credit s join companies c on c.id = s.company_id) t`
+and save it as `data/sinosure.json` (keep the stored copy if the connector is
+missing). Pass `--sinosure data/sinosure.json` to the build, and publish it as
+`state/sinosure.json` with the other state files.
+
 ```bash
 python3 -I scripts/explorer/build.py data/suppliers_merged.json data/all_price_files.json data/partner-explorer.html \
-  --date <today> --evidence data/stage_evidence.json --fin-summary data/fin_summary.json \
+  --date <today> --evidence data/stage_evidence.json --fin-summary data/fin_summary.json --sinosure data/sinosure.json \
   --trigger <trigger_id> --schedule "<schedule>"
 # stored copies without contact details (writes data/state_*.json)
 python3 -I scripts/explorer/scrub-state.py data

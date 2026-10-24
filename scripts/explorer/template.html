@@ -110,6 +110,12 @@ header.top .wrap { display: grid; gap: 10px; }
 .act.done { opacity: .85; }
 .act a { color: var(--link); }
 .act .match { font-size: 12.5px; background: var(--accent-soft); border-radius: 8px; padding: 6px 8px; }
+.chat-hide { align-self: flex-end; border: 1px solid var(--line); background: var(--bg); color: var(--muted); border-radius: 8px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; margin-bottom: 6px; }
+.chat-hide:hover { color: var(--fg); border-color: var(--faint); }
+.chat-open { position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); z-index: 7; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 4px 14px 4px 4px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
+.chat-open img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.layout.chat-off { grid-template-columns: minmax(0, 1fr); }
+.layout.chat-off .chat { display: none; }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .chat { position: static; height: auto; max-height: none; border-right: 0; border-bottom: 1px solid var(--line); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
@@ -217,6 +223,9 @@ tbody tr:last-child td { border-bottom: 0; }
 .fsum .big { font: 600 24px/1 var(--display); font-variant-numeric: tabular-nums; }
 .fsum .def { display: block; color: var(--muted); font-size: 12.5px; }
 .fsum .head { display: block; font-size: 13.5px; }
+#sino-summary { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); margin-bottom: 14px; }
+.fin-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; }
+.fin-card .big { font: 600 24px/1 var(--display); font-variant-numeric: tabular-nums; }
 .stagebar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
 .stagebar span { display: block; height: 100%; }
 .stagekey { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
@@ -254,6 +263,7 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
 
 <div class="layout">
 <aside class="chat" id="marie" aria-label="Chat with Marie">
+  <button type="button" class="chat-hide" id="chat-hide" aria-controls="marie" aria-expanded="true">Hide chat</button>
   <div class="chat-log" id="marie-log" aria-live="polite">
     <div class="turn a"><img class="pfp" src="data:image/webp;base64,AVATAR_B64" alt="Marie" width="44" height="44"><div class="bubble"><p>Hi, I'm Marie. Ask me about partners, prices or financing. I can also dig through your email, Drive and Chat, draft emails and messages for you to approve, and add business cards as potential partners.</p></div></div>
     <div class="marie-sugg" id="marie-sugg"></div>
@@ -285,6 +295,7 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
       <button class="tab" role="tab" id="tab-partners" aria-controls="partners" aria-selected="true">All<span class="n" id="n-partners"></span></button>
       <button class="tab" role="tab" id="tab-prices" aria-controls="prices" aria-selected="false">Hardware<span class="n" id="n-prices"></span></button>
       <button class="tab" role="tab" id="tab-financing" aria-controls="financing" aria-selected="false">Financing<span class="n" id="n-financing"></span></button>
+      <button class="tab" role="tab" id="tab-sinosure" aria-controls="sinosure" aria-selected="false">Sinosure<span class="n" id="n-sinosure"></span></button>
     </div>
     <div class="fx">
       <label for="fx-usd">₱ per USD <input id="fx-usd" type="number" step="0.01" min="0"></label>
@@ -346,6 +357,18 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
       <div class="table-wrap" id="fin-cards"><table id="fin-table"></table></div>
     </section>
 
+    <section class="view" id="sinosure" role="tabpanel" aria-labelledby="tab-sinosure" hidden>
+      <div class="panel-head"><h2>Sinosure trade credit</h2><p>Chinese suppliers that insure their export credit with Sinosure can sell to Helios on deferred terms once Sinosure sets a buyer credit limit on us. Strongest evidence first: these are the ones to ask.</p></div>
+      <div class="fin-summary" id="sino-summary"></div>
+      <div class="filters">
+        <div class="seg" id="sino-filters"></div>
+        <span class="spacer"></span>
+        <span class="count" id="sino-count"></span>
+      </div>
+      <div class="table-wrap"><table id="sino-table"></table></div>
+      <p class="sub" id="sino-foot"></p>
+    </section>
+
   </div>
 </main>
 
@@ -353,6 +376,7 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 40px; }
 </div>
 </div>
 
+<button type="button" class="chat-open" id="chat-open" aria-controls="marie" hidden><img src="data:image/webp;base64,AVATAR_B64" alt="" width="36" height="36">Chat with Marie</button>
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden aria-modal="true" role="dialog" aria-labelledby="d-name"></aside>
 
@@ -760,7 +784,7 @@ function marie() {
 /* tabs */
 function showTab(t) {
   st.tab = t; store.set('tab', t);
-  for (const id of ['prices', 'partners', 'financing']) {
+  for (const id of ['prices', 'partners', 'financing', 'sinosure']) {
     $('#' + id).hidden = id !== t;
     $('#tab-' + id).setAttribute('aria-selected', String(id === t));
   }
@@ -1069,6 +1093,7 @@ function openCompany(id) {
     ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ''}
     ${c.next ? `<div class="next">Next: ${esc(c.next)}</div>` : ''}
     ${evidenceBlock(c)}
+    ${c.sino ? `<div class="next">Sinosure: ${esc((SINO_EV[c.sino.evidence] || SINO_EV.unknown)[0])}${c.sino.note ? ' · ' + esc(c.sino.note) : ''} · ${esc(SINO_POLICY[c.sino.policy] || '')}</div>` : ''}
     <dl class="facts">
       ${c.domain ? `<dt>Website</dt><dd><a href="https://${esc(c.domain)}" target="_blank" rel="noopener">${esc(c.domain)}</a></dd>` : ''}
       ${c.country ? `<dt>Country</dt><dd>${esc(c.country)}</dd>` : ''}
@@ -1128,7 +1153,41 @@ function drawerProducts() {
 function closeDrawer() { $('#drawer').hidden = true; $('#scrim').hidden = true; lastFocus?.focus?.(); }
 
 /* ---------- events ---------- */
-function renderAll() { renderPrices(); renderPartners(); renderFinancing(); }
+/* ---------- Sinosure ---------- */
+const SINO_EV = { confirmed: ['Confirmed', 'var(--good)'], likely: ['Likely', 'var(--series-1)'], unknown: ['Unknown', 'var(--faint)'], none_found: ['None found', 'var(--faint)'] };
+const SINO_POLICY = { not_asked: 'Not asked', asked: 'Asked', has_policy: 'Has a policy', no_policy: 'No policy', declined: 'Declined' };
+const SINO_LIMIT = { none: 'No limit yet', requested: 'Limit requested', approved: 'Limit approved', rejected: 'Limit rejected', expired: 'Limit expired' };
+const sinoBadge = (e) => { const [t, col] = SINO_EV[e] || SINO_EV.unknown; return `<span class="status"><i style="background:${col}"></i>${esc(t)}</span>`; };
+function renderSinosure() {
+  const all = D.sinosure || [];
+  const order = ['confirmed', 'likely', 'unknown', 'none_found'];
+  const ec = {}; for (const r of all) ec[r.sinosure_evidence] = (ec[r.sinosure_evidence] || 0) + 1;
+  const asked = all.filter((r) => r.policy_status !== 'not_asked').length, limits = all.filter((r) => r.limit_status === 'approved').length;
+  $('#sino-summary').innerHTML = [['Confirmed users', ec.confirmed || 0, 'filings or Sinosure itself name them'], ['Likely users', ec.likely || 0, 'export credit insurance, insurer not named'],
+    ['Asked so far', asked, 'of ' + all.length + ' suppliers'], ['Credit limits approved', limits, 'buyer limit on Helios']]
+    .map(([t, n, sub]) => `<div class="fin-card"><div class="sub">${esc(t)}</div><div class="big">${n}</div><div class="sub">${esc(sub)}</div></div>`).join('');
+  $('#sino-filters').innerHTML = [['', 'All', all.length], ...order.filter((k) => ec[k]).map((k) => [k, SINO_EV[k][0], ec[k]])].map(([k, t, n]) =>
+    `<button class="pill" data-sino="${k}" aria-pressed="${(st.sino || '') === k}">${esc(t)}<span class="n">${n}</span></button>`).join('');
+  const rows = all.filter((r) => !st.sino || r.sinosure_evidence === st.sino)
+    .sort((a, b) => order.indexOf(a.sinosure_evidence) - order.indexOf(b.sinosure_evidence) || (a.next_follow_up_on || '9').localeCompare(b.next_follow_up_on || '9') || a.name.localeCompare(b.name));
+  $('#sino-count').textContent = `${rows.length} supplier${rows.length === 1 ? '' : 's'}`;
+  const name = (r) => { const c = r.cid && byId.get(r.cid); return c ? `<button class="link" data-cid="${c.id}">${esc(c.short || c.name)}</button>` : `<b>${esc(short_(r.name))}</b>`; };
+  const carriers = (r) => r.carriers.length ? r.carriers.slice(0, 4).map((id) => { const c = byId.get(id); return `<button class="link" data-cid="${id}">${esc(c.short || c.name)}</button>`; }).join(', ') + (r.carriers.length > 4 ? ` <span class="sub">+${r.carriers.length - 4}</span>` : '') : '<span class="sub">—</span>';
+  $('#sino-table').innerHTML = `<thead><tr><th>Supplier</th><th>Sinosure evidence</th><th>We asked</th><th>Credit limit on Helios</th><th>Carried by our partners</th><th>Follow up</th></tr></thead><tbody>` +
+    (rows.length ? rows.map((r) => { const c = r.cid && byId.get(r.cid); return `<tr>
+      <td>${name(r)}<div class="sub">${esc([r.country, c ? STATUS[c.status] : 'not in partner list'].filter(Boolean).join(' · '))}</div></td>
+      <td>${sinoBadge(r.sinosure_evidence)}${r.evidence_note ? `<div class="sub">${esc(r.evidence_note)}</div>` : ''}${r.evidence_url && /^https:\/\//.test(r.evidence_url) ? `<a class="sub" href="${esc(r.evidence_url)}" target="_blank" rel="noopener">Source${r.evidence_date ? ' · ' + date(r.evidence_date) : ''}</a>` : ''}</td>
+      <td>${esc(SINO_POLICY[r.policy_status] || r.policy_status || '—')}${r.asked_on ? `<div class="sub">${date(r.asked_on)}</div>` : ''}</td>
+      <td>${esc(SINO_LIMIT[r.limit_status] || r.limit_status || '—')}${r.limit_amount_usd != null ? `<div class="sub">US$${Number(r.limit_amount_usd).toLocaleString('en-US')}${r.payment_terms_days ? ' · ' + r.payment_terms_days + ' days' : ''}${r.premium_rate_pct != null ? ' · ' + r.premium_rate_pct + '% premium' : ''}</div>` : ''}</td>
+      <td>${carriers(r)}</td>
+      <td class="num" style="white-space:nowrap">${r.next_follow_up_on ? date(r.next_follow_up_on) : '<span class="sub">—</span>'}${r.notes ? `<div class="sub" style="white-space:normal">${esc(r.notes)}</div>` : ''}</td>
+    </tr>`; }).join('') : '<tr class="empty-row"><td colspan="6">No suppliers in this group.</td></tr>') + '</tbody>';
+  const upd = all.map((r) => r.updated_at).filter(Boolean).sort().pop();
+  $('#sino-foot').textContent = all.length ? `From the supplier trade credit tracker in the Helios database${upd ? ', updated ' + date(String(upd).slice(0, 10)) : ''}. The weekly supplier inbox scan updates "We asked" and the limit when suppliers mention Sinosure or credit terms by email.` : 'No Sinosure data loaded yet.';
+}
+const short_ = (n) => String(n || '').replace(/\s*\(.*?\)/g, (m) => (String(n).length > 32 ? '' : m)).replace(/,?\s+(Co\., Ltd\.?|Co\.,? Ltd|Ltd\.?|Inc\.?)$/i, '').trim();
+
+function renderAll() { renderPrices(); renderPartners(); renderFinancing(); renderSinosure(); }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('button, [data-cid]'); if (!t) return;
   if (t.id === 'd-close') return closeDrawer();
@@ -1139,6 +1198,7 @@ document.addEventListener('click', (e) => {
   if (t.dataset.basis) { st.basis[st.cat] = t.dataset.basis; st.psort = ['avg', 1]; return renderPrices(); }
   if (t.dataset.cat) { st.cat = t.dataset.cat; store.set('cat', st.cat); st.psort = ['avg', 1]; return renderPrices(); }
   if (t.dataset.psort) { const k = t.dataset.psort; st.psort = [k, st.psort[0] === k ? -st.psort[1] : (['n', 'latest', 'source'].includes(k) ? -1 : 1)]; return renderPrices(); }
+  if (t.dataset.sino != null) { st.sino = t.dataset.sino || null; return renderSinosure(); }
   if (t.dataset.fsort) { const k = t.dataset.fsort; st.fsort = [k, st.fsort[0] === k ? -st.fsort[1] : (k === 'last' || k === 'stage' ? -1 : 1)]; return renderFinancing(); }
   if (t.dataset.csort) { const k = t.dataset.csort; st.csort = [k, st.csort[0] === k ? -st.csort[1] : (k === 'last' || k === 'prices' ? -1 : 1)]; return renderPartners(); }
   if (t.dataset.stage) { st.stage = st.stage === t.dataset.stage ? null : t.dataset.stage; return renderPartners(); }
@@ -1168,7 +1228,19 @@ $('#exvat').addEventListener('change', (e) => { st.exvat = e.target.checked; sto
 let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (st.tab === 'prices') chart(priceRows()); }, 150); });
 
 $('#n-prices').textContent = D.stats.priced; $('#n-partners').textContent = D.companies.length;
+$('#n-sinosure').textContent = (D.sinosure || []).length || '';
 $('#n-financing').textContent = D.companies.filter((c) => c.types.some((t) => FIN_TYPES.includes(t))).length;
-header(); refreshBar(); marie(); showTab(st.tab); renderAll();
+/* hide or show the chat; remembered per browser */
+function chatToggle() {
+  const layout = $('.layout'), hide = $('#chat-hide'), open = $('#chat-open');
+  const set = (off, focus) => {
+    layout.classList.toggle('chat-off', off); open.hidden = !off; hide.setAttribute('aria-expanded', String(!off)); store.set('chatOff', off);
+    if (focus) (off ? open : $('#marie-q')).focus();
+  };
+  hide.addEventListener('click', () => set(true, true));
+  open.addEventListener('click', () => set(false, true));
+  set(store.get('chatOff', false), false);
+}
+header(); refreshBar(); marie(); chatToggle(); showTab(st.tab); renderAll();
 })();
 </script>

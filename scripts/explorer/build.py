@@ -16,8 +16,11 @@ fx = {'USD': 63.07, 'CNY': 9.43}  # BSP reference rates, 19 Oct 2026
 gen = datetime.date.today().isoformat()
 evidence = {}
 fin_summary_file = None
+sinosure_file = None
 refresh = {}
 for i, a in enumerate(args):
+    if a == '--sinosure':
+        sinosure_file = args[i + 1]
     if a == '--fin-summary':
         fin_summary_file = args[i + 1]
     if a == '--trigger':
@@ -173,6 +176,33 @@ data = {
     'companies': out_companies, 'lines': lines,
     'files': {f: v for f, v in file_info.items() if any(l['file'] == f for l in lines) or any(f in c['attachments'] for c in out_companies)},
 }
+# Sinosure trade-credit evidence per supplier (from Supabase supplier_trade_credit).
+# A row links to the matching company in this page by website domain or exact
+# name, and lists the companies here that carry its brand.
+def sinosure_rows():
+    if not sinosure_file or not os.path.exists(sinosure_file):
+        return []
+    dom = lambda d: (d or '').lower().replace('www.', '').strip() or None
+    by_dom = {dom(c['domain']): c for c in out_companies if dom(c['domain'])}
+    by_name = {c['name'].lower(): c for c in out_companies}
+    rows = []
+    for r in json.load(open(sinosure_file)):
+        c = by_dom.get(dom(r.get('domain'))) or by_name.get((r.get('name') or '').lower())
+        aliases = {a.strip().lower() for a in re.split(r'[()]', r.get('name') or '') if a.strip()}
+        aliases |= {short_name(r.get('name') or '').split(' ')[0].lower()}
+        aliases = {a for a in aliases if len(a) > 2 and a not in {'co.', 'ltd', 'new'}}
+        hit = lambda t: any(re.search(r'\b' + re.escape(a) + r'\b', (t or '').lower()) for a in aliases)
+        sells = {l['cid'] for l in lines if hit(l['name']) or hit(l.get('model'))}
+        carriers = [x['id'] for x in out_companies if x is not c and (any(hit(b) for b in x['brands']) or x['id'] in sells)]
+        rows.append({k: r.get(k) for k in ('name', 'domain', 'country', 'sinosure_evidence', 'evidence_note', 'evidence_url', 'evidence_date',
+                     'policy_status', 'limit_status', 'limit_amount_usd', 'payment_terms_days', 'premium_rate_pct', 'asked_on',
+                     'next_follow_up_on', 'notes', 'updated_at')} | {'cid': c['id'] if c else None, 'carriers': carriers})
+        if c:
+            c['sino'] = {'evidence': r.get('sinosure_evidence'), 'policy': r.get('policy_status'), 'limit': r.get('limit_status'),
+                         'note': r.get('evidence_note'), 'url': r.get('evidence_url')}
+    return rows
+
+data['sinosure'] = sinosure_rows()
 EMAIL = re.compile(r'[\w.+-]+@[\w-]+\.[\w.]+')
 PHONE = re.compile(r'(?:\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}|\+\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}')
 
