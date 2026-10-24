@@ -86,3 +86,14 @@ A weekly routine refreshes it with only the mail since the last update; see
 `.claude/skills/explorer-refresh/SKILL.md`. The artifact stores its own data
 under `state/` with contact details removed (`scripts/explorer/scrub-state.py`),
 and `scripts/merge-incremental.mjs` folds each week's delta into it.
+
+## Supplier inbox scanner
+
+A weekly cloud scanner (`.claude/skills/supplier-inbox-scan/SKILL.md`) finds
+the week's supplier and distribution-candidate emails, matches them to
+companies in the live Supabase database, gives each a Drive folder under
+"Helios Suppliers", and puts lines from price lists into `offer_candidates`
+for approval, then posts a summary in Google Chat. The Apps Script in
+`scripts/drive-saver/Code.gs` (installed in Edmund's Google account) copies
+the attachments into those folders hourly. Database writes go through
+`scripts/scanner/db.mjs`, which needs `DATABASE_URL`.
